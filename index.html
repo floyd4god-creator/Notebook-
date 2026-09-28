@@ -115,6 +115,20 @@ body.pen .bar-actions{display:none}
 body.pen .pen-badge{display:inline-flex}
 @media (max-width:760px){.pen-badge{display:none!important}.tool{width:36px}}
 
+/* PDF pages */
+.pdf-view{display:none;position:absolute;inset:0;align-items:center;justify-content:center;padding:14px 18px 18px}
+.sheet.is-pdf .pdf-view{display:flex}
+.sheet.is-pdf .mirror,.sheet.is-pdf .page-body,.sheet.is-pdf .margin-line{display:none}
+.pdf-view img{display:block;max-width:100%;max-height:100%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25),0 6px 16px -8px rgba(0,0,0,.35)}
+.pdf-view img:not([src]),.pdf-view img[src=""]{width:70%;aspect-ratio:8.5/11;background:repeating-linear-gradient(0deg,#f4f0e8 0 20px,#ece6da 20px 21px)}
+.pager-right{justify-self:end;display:flex;gap:2px}
+.progress{position:fixed;inset:0;z-index:40;background:rgba(10,6,4,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+.progress-card{width:min(380px,100%);background:var(--paper);color:var(--text);border-radius:12px;padding:22px 22px 20px;box-shadow:0 20px 50px -10px rgba(0,0,0,.6)}
+.progress-card h3{margin:0 0 4px;font:600 24px/1.2 var(--display)}
+.progress-card p{margin:0 0 14px;font-size:14px;color:var(--muted)}
+.bar-track{height:8px;border-radius:99px;background:rgba(120,90,50,.15);overflow:hidden}
+.bar-fill{height:100%;width:0;background:var(--gold);border-radius:99px;transition:width .2s}
+
 /* Page turn */
 .sheet.ghost{z-index:4;transform-origin:0 50%;backface-visibility:hidden;-webkit-backface-visibility:hidden;pointer-events:none;will-change:transform}
 .ghost .mirror{color:var(--text)}
@@ -164,8 +178,7 @@ body.closed .pager{opacity:0;pointer-events:none}
 .round:disabled{opacity:.3;cursor:default}
 .text-btn{border:0;background:transparent;color:var(--desk-text);font-size:14px;padding:10px 8px;border-radius:6px;display:inline-flex;align-items:center;gap:6px}
 .text-btn:hover{color:#fff}
-.pager .text-btn:first-child{justify-self:start}
-.pager .text-btn:last-child{justify-self:end}
+.pager > .text-btn:first-child{justify-self:start}
 
 /* Drawer */
 .scrim{position:fixed;inset:0;background:rgba(10,6,4,.5);opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
@@ -276,6 +289,7 @@ body.closed .pager{opacity:0;pointer-events:none}
         <div class="body-wrap">
           <div class="mirror" id="mirror" aria-hidden="true"></div>
           <textarea id="pageBody" class="page-body" placeholder="Start writing…" aria-label="Page notes"></textarea>
+          <div class="pdf-view" id="pdfView"><img id="pdfImg" alt=""></div>
           <canvas class="ink" id="ink"></canvas>
           <div class="hl-chip" id="hlChip"><span id="hlText"></span><button id="hlClear">Clear</button></div>
         </div>
@@ -304,10 +318,19 @@ body.closed .pager{opacity:0;pointer-events:none}
     <span id="pagerLabel"></span>
     <button id="btnNext" class="round" aria-label="Next page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button>
   </div>
-  <button id="btnBackup" class="text-btn" aria-label="Backup">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg><span class="lbl">Backup</span>
-  </button>
+  <div class="pager-right">
+    <button id="btnPdf" class="text-btn" aria-label="Add a PDF to this section">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 12v6M9 15h6"/></svg><span class="lbl">Add PDF</span>
+    </button>
+    <button id="btnBackup" class="text-btn" aria-label="Backup">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg><span class="lbl">Backup</span>
+    </button>
+  </div>
 </footer>
+<input type="file" id="pdfInput" accept="application/pdf,.pdf" hidden>
+<div class="progress" id="progress" hidden role="alertdialog" aria-live="polite">
+  <div class="progress-card"><h3 id="progTitle">Adding PDF</h3><p id="progText">Opening the file…</p><div class="bar-track"><div class="bar-fill" id="progFill"></div></div></div>
+</div>
 
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" aria-hidden="true" role="dialog" aria-labelledby="drawerTitle">
@@ -352,7 +375,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     const sections = names.map((n, i) => ({ id:uid(), name:n, color:PALETTE[i] }));
     const pages = sections.map(s => blank(s.id));
     pages[0].title = 'Welcome';
-    pages[0].body = "Swipe left or right on the page, or use the arrows below, to turn pages.\n\nThe colored tabs on the right edge are sections. Tap a tab to jump to that section. Tap + to add a section, and use Contents, then Manage sections, to rename, recolor, reorder or delete them.\n\nNew page adds a page to the section you're in.\n\nTap Search to find any word or phrase across every page. Matching words are highlighted on the page.\n\nTap Pen to write by hand with your Apple Pencil. Choose a pen color, the highlighter or the eraser, and tap Done to go back to typing. Handwriting stays on the page but isn't searchable.\n\nTap Close to shut the cover. Your notes save automatically on this device; use Backup now and then to download a copy.";
+    pages[0].body = "Swipe left or right on the page, or use the arrows below, to turn pages.\n\nThe colored tabs on the right edge are sections. Tap a tab to jump to that section. Tap + to add a section, and use Contents, then Manage sections, to rename, recolor, reorder or delete them.\n\nNew page adds a page to the section you're in.\n\nTap Search to find any word or phrase across every page. Matching words are highlighted on the page.\n\nTap Pen to write by hand with your Apple Pencil. Choose a pen color, the highlighter or the eraser, and tap Done to go back to typing. Handwriting stays on the page but isn't searchable.\n\nTap Add PDF to put a PDF into the section you're in. Each PDF page becomes a notebook page you can flip through, search and write on with the pen.\n\nTap Close to shut the cover. Your notes save automatically on this device; use Backup now and then to download a copy.";
     return { title:'Notebook', sections, pages, currentId:pages[0].id };
   }
   function migrate(v1){
@@ -372,7 +395,8 @@ body.closed .pager{opacity:0;pointer-events:none}
     const ids = new Set(s.sections.map(x => x.id)), now = Date.now();
     s.pages = s.pages.filter(p => p && typeof p.title === 'string' && typeof p.body === 'string').map(p => ({
       id:p.id || uid(), sectionId:ids.has(p.sectionId) ? p.sectionId : s.sections[0].id,
-      title:p.title, body:p.body, created:p.created || now, updated:p.updated || now }));
+      title:p.title, body:p.body, created:p.created || now, updated:p.updated || now,
+      pdf:(p.pdf && typeof p.pdf === 'object') ? { name:String(p.pdf.name || 'PDF'), n:p.pdf.n | 0, of:p.pdf.of | 0 } : undefined }));
     s.sections.forEach(x => { if (!s.pages.some(p => p.sectionId === x.id)) s.pages.push(blank(x.id)); });
     if (!s.pages.some(p => p.id === s.currentId)) s.currentId = ordered(s)[0].id;
     s.title = typeof s.title === 'string' && s.title.trim() ? s.title : 'Notebook';
@@ -658,6 +682,163 @@ body.closed .pager{opacity:0;pointer-events:none}
   if (darkMQ.addEventListener) darkMQ.addEventListener('change', redrawInk);
   Ink.ready.then(() => { if (!flipping) { ensureInkSpace(); redrawInk(); } });
 
+
+  /* ---------- PDF pages ---------- */
+  const PdfStore = (() => {
+    const texts = new Map(), urls = new Map();
+    let db = null;
+    const ready = new Promise(res => {
+      let settled = false; const done = () => { if (!settled) { settled = true; res(); } };
+      try {
+        const r = indexedDB.open('leatherNotebookPdf', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('pages');
+        r.onsuccess = () => {
+          db = r.result;
+          try {
+            const q = db.transaction('pages', 'readonly').objectStore('pages').openCursor();
+            q.onsuccess = () => { const c = q.result; if (c) { texts.set(c.key, (c.value && c.value.text) || ''); c.continue(); } else done(); };
+            q.onerror = done;
+          } catch (e) { done(); }
+        };
+        r.onerror = done;
+      } catch (e) { done(); }
+      setTimeout(done, 3000);
+    });
+    const req = (mode, fn) => new Promise((res, rej) => {
+      if (!db) { rej(new Error('nodb')); return; }
+      const tx = db.transaction('pages', mode), st = tx.objectStore('pages');
+      let out; const r = fn(st); if (r) r.onsuccess = () => { out = r.result; };
+      tx.oncomplete = () => res(out); tx.onerror = tx.onabort = () => rej(tx.error || new Error('tx'));
+    });
+    const blobToDataUrl = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+    return {
+      ready,
+      ok: () => !!db,
+      text: id => texts.get(id) || '',
+      cached: id => urls.get(id) || '',
+      put(id, rec){ texts.set(id, rec.text || ''); return req('readwrite', st => st.put(rec, id)); },
+      async url(id){
+        if (urls.has(id)) return urls.get(id);
+        const rec = await req('readonly', st => st.get(id));
+        if (!rec || !rec.img) return '';
+        const u = URL.createObjectURL(rec.img); urls.set(id, u);
+        if (urls.size > 40) { const k = urls.keys().next().value; URL.revokeObjectURL(urls.get(k)); urls.delete(k); }
+        return u;
+      },
+      remove(id){ texts.delete(id); if (urls.has(id)) { URL.revokeObjectURL(urls.get(id)); urls.delete(id); } return req('readwrite', st => st.delete(id)).catch(() => {}); },
+      async exportAll(){
+        const out = {};
+        const ids = state.pages.filter(p => p.pdf).map(p => p.id);
+        for (const id of ids) {
+          const rec = await req('readonly', st => st.get(id));
+          if (rec && rec.img) out[id] = { img:await blobToDataUrl(rec.img), text:rec.text || '', w:rec.w, h:rec.h };
+        }
+        return out;
+      },
+      async replaceAll(obj, ids){
+        if (!db) return;
+        urls.forEach(u => URL.revokeObjectURL(u)); urls.clear(); texts.clear();
+        await req('readwrite', st => st.clear());
+        for (const id of Object.keys(obj)) {
+          if (!ids.has(id) || !obj[id] || !obj[id].img) continue;
+          try { const img = await (await fetch(obj[id].img)).blob(); await this.put(id, { img, text:obj[id].text || '', w:obj[id].w, h:obj[id].h }); } catch (e) {}
+        }
+      }
+    };
+  })();
+
+  function showPdf(p){
+    const img = document.getElementById('pdfImg');
+    if (!p.pdf) { img.removeAttribute('src'); img.dataset.id = ''; return; }
+    if (img.dataset.id === p.id && img.getAttribute('src')) return;
+    img.dataset.id = p.id;
+    const c = PdfStore.cached(p.id);
+    if (c) img.src = c; else img.removeAttribute('src');
+    PdfStore.ready.then(() => PdfStore.url(p.id)).then(u => { if (img.dataset.id === p.id && u) img.src = u; }).catch(() => {});
+    // warm up neighbours so page turns show the image straight away
+    const list = ordered(), i = list.indexOf(p);
+    [list[i - 1], list[i + 1]].forEach(q => { if (q && q.pdf) PdfStore.ready.then(() => PdfStore.url(q.id)).catch(() => {}); });
+  }
+
+  const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  let pdfjsPromise = null;
+  function loadPdfJs(){
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (!pdfjsPromise) pdfjsPromise = new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = PDFJS + 'pdf.min.js';
+      s.onload = () => { const lib = window.pdfjsLib; if (!lib) { pdfjsPromise = null; rej(new Error('offline')); return; } lib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; res(lib); };
+      s.onerror = () => { pdfjsPromise = null; s.remove(); rej(new Error('offline')); };
+      document.head.appendChild(s);
+    });
+    return pdfjsPromise;
+  }
+  const prog = { box:$('progress'), title:$('progTitle'), text:$('progText'), fill:$('progFill') };
+  function progress(title, text, frac){ prog.box.hidden = false; prog.title.textContent = title; prog.text.textContent = text; prog.fill.style.width = Math.round((frac || 0) * 100) + '%'; }
+  const hideProgress = () => { prog.box.hidden = true; };
+
+  async function importPdf(file){
+    await PdfStore.ready;
+    if (!PdfStore.ok()) { toast("This device won't let the notebook store PDFs."); return; }
+    const sec = secById(cur().sectionId), sid = sec.id;
+    const name = (file.name || 'PDF').replace(/\.pdf$/i, '').trim() || 'PDF';
+    progress('Adding PDF', 'Opening “' + name + '”…', 0);
+    const saved = [];
+    let doc = null;
+    try {
+      const lib = await loadPdfJs();
+      doc = await lib.getDocument({ data:new Uint8Array(await file.arrayBuffer()) }).promise;
+      const n = doc.numPages;
+      if (n > 150 && !confirm(`“${name}” has ${n} pages. Adding it may take a while and use a lot of storage. Add it anyway?`)) { hideProgress(); doc.destroy(); return; }
+      const newPages = [];
+      for (let i = 1; i <= n; i++) {
+        progress('Adding PDF', `Page ${i} of ${n} from “${name}”`, (i - 1) / n);
+        const page = await doc.getPage(i);
+        const base = page.getViewport({ scale:1 });
+        const vp = page.getViewport({ scale:Math.min(3, 1600 / base.width) });
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+        await page.render({ canvasContext:ctx, viewport:vp }).promise;
+        const img = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.85));
+        let text = '';
+        try { const tc = await page.getTextContent(); text = tc.items.map(it => it.str + (it.hasEOL ? '\n' : ' ')).join('').replace(/[ \t]+/g, ' ').trim(); } catch (e) {}
+        const pg = blank(sid);
+        pg.title = n > 1 ? `${name}, p. ${i}` : name;
+        pg.pdf = { name, n:i, of:n };
+        await PdfStore.put(pg.id, { img, text, w:cv.width, h:cv.height });
+        saved.push(pg.id); newPages.push(pg);
+        cv.width = cv.height = 0; page.cleanup();
+      }
+      progress('Adding PDF', 'Finishing up…', 1);
+      const inSec = pagesIn(sid), last = inSec[inSec.length - 1];
+      const replaceBlank = inSec.length === 1 && !last.title && !last.body && !last.pdf && !Ink.has(last.id);
+      state.pages.splice(state.pages.indexOf(last) + 1, 0, ...newPages);
+      if (replaceBlank) {
+        state.pages.splice(state.pages.indexOf(last), 1); Ink.remove(last.id);
+        if (state.currentId === last.id) state.currentId = newPages[0].id;
+      }
+      save(true);
+      hideProgress();
+      if (state.currentId === newPages[0].id) render(); else goTo(newPages[0].id);
+      toast(`Added ${plural(n, 'page')} from “${name}” to ${sec.name}`);
+    } catch (e) {
+      hideProgress();
+      saved.forEach(id => PdfStore.remove(id));
+      const msg = String(e && (e.name || e.message) || '');
+      if (/offline/.test(msg)) toast('Connect to the internet to add a PDF. Once added, PDF pages work offline.');
+      else if (/Password/i.test(msg)) toast('That PDF is password-protected. Remove the password and try again.');
+      else if (/QuotaExceeded|quota/i.test(msg)) toast('The iPad is out of storage for this notebook. Remove some PDF pages and try again.');
+      else toast("Couldn't open that PDF. It may be damaged or not a PDF file.");
+    } finally {
+      if (doc) try { doc.destroy(); } catch (e) {}
+    }
+  }
+  $('btnPdf').addEventListener('click', () => openCover(() => $('pdfInput').click()));
+  $('pdfInput').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importPdf(f); });
+  PdfStore.ready.then(() => { if (cur() && cur().pdf) { const img = document.getElementById('pdfImg'); img.dataset.id = ''; showPdf(cur()); } });
+
   /* ---------- Rendering ---------- */
   let query = '', pendingScroll = false;
   function countIn(text, ql){
@@ -682,7 +863,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     const p = cur(), ql = query.toLowerCase();
     el.pageTitle.classList.toggle('hit', !!query && p.title.toLowerCase().includes(ql));
     if (query) {
-      const n = countIn(p.title, ql) + countIn(p.body, ql);
+      const n = countIn(p.title, ql) + countIn(p.body, ql) + countIn(PdfStore.text(p.id), ql);
       el.chipText.textContent = n ? `${plural(n, 'match')} for “${query}”` : `No matches for “${query}” on this page`;
       el.chip.classList.add('on');
     } else el.chip.classList.remove('on');
@@ -697,6 +878,8 @@ body.closed .pager{opacity:0;pointer-events:none}
     const p = cur(), sec = secById(p.sectionId), inSec = pagesIn(sec.id), pos = inSec.indexOf(p) + 1;
     const list = ordered(), idx = list.indexOf(p), scroll = el.body.scrollTop;
     el.sheet.style.setProperty('--sec', sec.color);
+    el.sheet.classList.toggle('is-pdf', !!p.pdf);
+    showPdf(p);
     el.secLabel.textContent = sec.name;
     el.pageTitle.value = p.title;
     el.body.value = p.body;
@@ -765,7 +948,8 @@ body.closed .pager{opacity:0;pointer-events:none}
     g.innerHTML = `<div class="sheet-inner"><div class="margin-line"></div><div class="sheet-head"><div class="head-main"><div class="sec-label">${esc(sec.name)}</div>
       <div class="g-title${p.title ? '' : ' empty'}">${esc(p.title || 'Untitled page')}</div></div>
       <div class="page-meta"><span>Page <b>${inSec.indexOf(p) + 1}</b> of ${inSec.length}</span><span>Updated ${fmt(p.updated)}</span></div></div>
-      <div class="body-wrap"><div class="mirror">${markup(p.body)}</div><canvas class="ink"></canvas></div></div>`;
+      <div class="body-wrap"><div class="mirror">${markup(p.body)}</div>${p.pdf ? `<div class="pdf-view"><img alt="" src="${PdfStore.cached(p.id) || ''}"></div>` : ''}<canvas class="ink"></canvas></div></div>`;
+    if (p.pdf) g.classList.add('is-pdf');
     el.stack.appendChild(g);
     const mir = g.querySelector('.mirror');
     if (p.id === state.currentId) mir.style.paddingBottom = el.mirror.style.paddingBottom;
@@ -833,14 +1017,16 @@ body.closed .pager{opacity:0;pointer-events:none}
   $('btnDelete').addEventListener('click', () => {
     const p = cur(), name = p.title || 'this page', inSec = pagesIn(p.sectionId);
     if (inSec.length === 1) {
-      if (!p.title && !p.body && !Ink.has(p.id)) { toast('Each section keeps at least one page.'); return; }
+      if (!p.title && !p.body && !p.pdf && !Ink.has(p.id)) { toast('Each section keeps at least one page.'); return; }
       if (!confirm(`Clear “${name}”? It's the only page in this section, so its writing and handwriting will be erased. This can't be undone.`)) return;
       p.title = ''; p.body = ''; p.updated = Date.now(); Ink.set(p.id, [], true); undo.delete(p.id);
+      if (p.pdf) { delete p.pdf; PdfStore.remove(p.id); }
       render(); save(true); toast('Page cleared'); return;
     }
     if (!confirm(`Delete “${name}”? This can't be undone.`)) return;
     const i = inSec.indexOf(p), nextP = inSec[i + 1] || inSec[i - 1];
     state.pages.splice(state.pages.indexOf(p), 1);
+    if (p.pdf) PdfStore.remove(p.id);
     Ink.remove(p.id); undo.delete(p.id);
     state.currentId = nextP.id;
     render(); save(true); toast('Page deleted');
@@ -870,7 +1056,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     if (!confirm(`Delete the “${s.name}” section and its ${plural(n, 'page')}? This can't be undone.`)) return;
     const wasCurrent = cur().sectionId === sid;
     state.sections = state.sections.filter(x => x.id !== sid);
-    state.pages.filter(p => p.sectionId === sid).forEach(p => { Ink.remove(p.id); undo.delete(p.id); });
+    state.pages.filter(p => p.sectionId === sid).forEach(p => { Ink.remove(p.id); undo.delete(p.id); if (p.pdf) PdfStore.remove(p.id); });
     state.pages = state.pages.filter(p => p.sectionId !== sid);
     if (wasCurrent) state.currentId = ordered()[0].id;
     render(); save(true); renderSections(); toast('Section deleted');
@@ -913,7 +1099,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     }
     const ql = query.toLowerCase(); let total = 0; const rows = [];
     ordered().forEach(p => {
-      const c = countIn(p.title, ql) + countIn(p.body, ql);
+      const c = countIn(p.title, ql) + countIn(p.body, ql) + countIn(PdfStore.text(p.id), ql);
       if (c) { total += c; rows.push({ p, c }); }
     });
     if (!rows.length) {
@@ -923,7 +1109,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     }
     el.summary.textContent = `${plural(total, 'match')} on ${plural(rows.length, 'page')}`;
     el.list.innerHTML = rows.map(({ p, c }) => {
-      const sec = secById(p.sectionId), pos = pagesIn(sec.id).indexOf(p) + 1, sn = snippet(p.body, ql);
+      const sec = secById(p.sectionId), pos = pagesIn(sec.id).indexOf(p) + 1, sn = snippet(p.body, ql) || snippet(PdfStore.text(p.id), ql);
       return `<button class="item" data-pid="${p.id}"><div class="top"><span class="t">${esc(p.title || 'Untitled page')}</span><span class="n">${c}</span></div>
         <div class="where" style="--c:${sec.color}"><i></i>${esc(sec.name)}, page ${pos}</div>
         ${sn ? `<div class="snip">${sn}</div>` : ''}</button>`;
@@ -935,11 +1121,12 @@ body.closed .pager{opacity:0;pointer-events:none}
       const ps = pagesIn(s.id);
       return `<div class="grp"><div class="grp-head" style="--c:${s.color}"><i></i>${esc(s.name)}</div>` +
         ps.map((p, i) => `<button class="item${p.id === state.currentId ? ' current' : ''}" data-pid="${p.id}"><div class="top">
-          <span class="pno">p. ${i + 1}</span><span class="t">${esc(p.title || 'Untitled page')}</span><span class="n">${Ink.has(p.id) ? PEN_MARK : ''}${fmt(p.updated)}</span></div></button>`).join('') +
+          <span class="pno">p. ${i + 1}</span><span class="t">${esc(p.title || 'Untitled page')}</span><span class="n">${p.pdf ? PDF_MARK : ''}${Ink.has(p.id) ? PEN_MARK : ''}${fmt(p.updated)}</span></div></button>`).join('') +
         '</div>';
     }).join('') + '<button class="btn-block" data-act="manage">Manage sections</button>';
   }
   const PEN_MARK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:6px" aria-label="Has handwriting"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/></svg>';
+  const PDF_MARK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:6px" aria-label="PDF page"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
   const ICON_UP = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';
   const ICON_DOWN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
   const ICON_DEL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
@@ -961,11 +1148,13 @@ body.closed .pager{opacity:0;pointer-events:none}
       <p>Your notebook saves automatically on this device. Download a backup now and then so you keep a copy if the device is replaced or its website data is cleared.</p>
       <button class="btn-block primary" data-act="download">Download backup</button>
       <button class="btn-block" data-act="restore">Restore from a backup file</button>
-      <p class="fine">Backups include your handwriting. Restoring replaces every section and page in this notebook with the ones in the file.</p></div>`;
+      <p class="fine">Backups include your handwriting and PDFs, so a notebook with many PDFs makes a larger file. Restoring replaces every section and page in this notebook with the ones in the file.</p></div>`;
   }
-  function downloadBackup(){
+  async function downloadBackup(){
     save(true); Ink.flush();
-    const blob = new Blob([JSON.stringify(Object.assign({}, state, { ink:Ink.all() }))], {type:'application/json'});
+    let pdf = {};
+    try { pdf = await PdfStore.exportAll(); } catch (e) { toast("Couldn't include PDFs in this backup."); }
+    const blob = new Blob([JSON.stringify(Object.assign({}, state, { ink:Ink.all(), pdf }))], {type:'application/json'});
     const a = document.createElement('a'), d = new Date();
     a.href = URL.createObjectURL(blob);
     a.download = `notebook-backup-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.json`;
@@ -987,6 +1176,7 @@ body.closed .pager{opacity:0;pointer-events:none}
       const ids = new Set(s.pages.map(x => x.id)), ink = {};
       Object.keys((raw && raw.ink) || {}).forEach(k => { if (ids.has(k) && Array.isArray(raw.ink[k])) ink[k] = raw.ink[k]; });
       Ink.replaceAll(ink); undo.clear();
+      PdfStore.replaceAll((raw && raw.pdf) || {}, ids).then(() => render(true));
       el.nbTitle.value = state.title; setTitle();
       render(); save(true); closeDrawer(); toast('Notebook restored');
     };

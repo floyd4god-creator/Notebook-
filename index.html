@@ -89,6 +89,9 @@ svg{flex:none}
 .mirror,.page-body{position:absolute;inset:0;margin:0;padding:6px 26px 48px 78px;font:400 19px/32px var(--serif);white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;letter-spacing:0;tab-size:4}
 .mirror{color:transparent;overflow:hidden;background-image:linear-gradient(to bottom,transparent 31px,var(--rule) 31px);background-size:100% 32px;background-position:0 6px;background-attachment:local}
 .mirror mark{background:var(--mark);color:transparent;border-radius:3px;box-shadow:0 0 0 2px var(--mark)}
+.mirror .done{text-decoration:line-through;text-decoration-color:var(--muted);text-decoration-thickness:1.5px}
+.mirror .cb{border-radius:4px}
+.ghost .mirror .done{color:var(--muted)}
 .page-body{background:transparent;border:0;resize:none;color:var(--text);overflow-y:auto;outline:none;caret-color:var(--sec);-webkit-appearance:none;border-radius:0}
 .page-body::placeholder{color:var(--muted);opacity:.6}
 
@@ -250,6 +253,9 @@ body.closed .pager{opacity:0;pointer-events:none}
     <button id="btnContents" class="icon-btn" aria-label="Contents">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg><span class="lbl">Contents</span>
     </button>
+    <button id="btnCheck" class="icon-btn" aria-label="Checklist">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="6" height="6" rx="1.2"/><path d="m4.5 7 1.2 1.2L8 5.9"/><rect x="3" y="14" width="6" height="6" rx="1.2"/><path d="M13 7h8M13 17h8"/></svg><span class="lbl">Checklist</span>
+    </button>
     <button id="btnPen" class="icon-btn" aria-label="Pen mode">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/><path d="m14.5 5.5 3 3"/></svg><span class="lbl">Pen</span>
     </button>
@@ -375,7 +381,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     const sections = names.map((n, i) => ({ id:uid(), name:n, color:PALETTE[i] }));
     const pages = sections.map(s => blank(s.id));
     pages[0].title = 'Welcome';
-    pages[0].body = "Swipe left or right on the page, or use the arrows below, to turn pages.\n\nThe colored tabs on the right edge are sections. Tap a tab to jump to that section. Tap + to add a section, and use Contents, then Manage sections, to rename, recolor, reorder or delete them.\n\nNew page adds a page to the section you're in.\n\nTap Search to find any word or phrase across every page. Matching words are highlighted on the page.\n\nTap Pen to write by hand with your Apple Pencil. Choose a pen color, the highlighter or the eraser, and tap Done to go back to typing. Handwriting stays on the page but isn't searchable.\n\nTap Add PDF to put a PDF into the section you're in. Each PDF page becomes a notebook page you can flip through, search and write on with the pen.\n\nTap Close to shut the cover. Your notes save automatically on this device; use Backup now and then to download a copy.";
+    pages[0].body = "Swipe left or right on the page, or use the arrows below, to turn pages.\n\nThe colored tabs on the right edge are sections. Tap a tab to jump to that section. Tap + to add a section, and use Contents, then Manage sections, to rename, recolor, reorder or delete them.\n\nNew page adds a page to the section you're in.\n\nTap Search to find any word or phrase across every page. Matching words are highlighted on the page.\n\nTap Pen to write by hand with your Apple Pencil. Choose a pen color, the highlighter or the eraser, and tap Done to go back to typing. Handwriting stays on the page but isn't searchable.\n\nTap Checklist to turn lines into check boxes. Tap a box to check it off; press Return for the next item, or Return twice to end the list.\n\nTap Add PDF to put a PDF into the section you're in. Each PDF page becomes a notebook page you can flip through, search and write on with the pen.\n\nTap Close to shut the cover. Your notes save automatically on this device; use Backup now and then to download a copy.";
     return { title:'Notebook', sections, pages, currentId:pages[0].id };
   }
   function migrate(v1){
@@ -847,15 +853,25 @@ body.closed .pager{opacity:0;pointer-events:none}
     while ((i = lo.indexOf(ql, i)) !== -1) { c++; i += ql.length; }
     return c;
   }
+  const BOX = '\u2610', TICK = '\u2611';
+  const BOX_RE = /^([ \t]*)([\u2610\u2611])/;
+  function markSearch(text){
+    if (!query) return esc(text);
+    const re = new RegExp(escRe(query), 'gi'); let out = '', last = 0, m;
+    while ((m = re.exec(text))) { out += esc(text.slice(last, m.index)) + '<mark>' + esc(m[0]) + '</mark>'; last = m.index + m[0].length; }
+    return out + esc(text.slice(last));
+  }
   function markup(text){
-    let out = '';
-    if (!query) out = esc(text);
-    else {
-      const re = new RegExp(escRe(query), 'gi'); let last = 0, m;
-      while ((m = re.exec(text))) { out += esc(text.slice(last, m.index)) + '<mark>' + esc(m[0]) + '</mark>'; last = m.index + m[0].length; }
-      out += esc(text.slice(last));
-    }
-    return out + '\n\u200b';
+    let offset = 0;
+    const html = text.split('\n').map(line => {
+      const start = offset; offset += line.length + 1;
+      const m = BOX_RE.exec(line);
+      if (!m) return markSearch(line);
+      const pos = start + m[1].length, rest = line.slice(m[0].length);
+      return esc(m[1]) + `<span class="cb" data-pos="${pos}">${m[2]}</span>` +
+        (m[2] === TICK ? esc(/^\s*/.exec(rest)[0]) + `<span class="done">${markSearch(rest.replace(/^\s*/, ''))}</span>` : markSearch(rest));
+    }).join('\n');
+    return html + '\n\u200b';
   }
   function updateMirror(){
     el.mirror.innerHTML = markup(el.body.value);
@@ -1001,6 +1017,92 @@ body.closed .pager{opacity:0;pointer-events:none}
   el.pageTitle.addEventListener('input', () => { const p = cur(); p.title = el.pageTitle.value; touched(p); });
   el.pageTitle.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.body.focus(); } });
   el.body.addEventListener('input', () => { const p = cur(); p.body = el.body.value; touched(p); });
+
+  /* ---------- Checklists ---------- */
+  function setBody(value, selStart, selEnd){
+    el.body.value = value;
+    const p = cur(); p.body = value;
+    if (selStart != null) { try { el.body.setSelectionRange(selStart, selEnd == null ? selStart : selEnd); } catch (e) {} }
+    touched(p);
+  }
+  function lineStartAt(v, i){ return v.lastIndexOf('\n', i - 1) + 1; }
+  function toggleBoxAt(pos){
+    const v = el.body.value, ch = v[pos];
+    if (ch !== BOX && ch !== TICK) return;
+    const keepS = el.body.selectionStart, keepE = el.body.selectionEnd;
+    setBody(v.slice(0, pos) + (ch === BOX ? TICK : BOX) + v.slice(pos + 1), keepS, keepE);
+  }
+  function hitBox(x, y){
+    const spans = el.mirror.querySelectorAll('.cb');
+    for (const s of spans) {
+      const r = s.getBoundingClientRect(), slop = 8;
+      if (x >= r.left - slop && x <= r.right + slop && y >= r.top - 4 && y <= r.bottom + 4) return +s.dataset.pos;
+    }
+    return -1;
+  }
+  function boxTap(e, x, y){
+    if (penOn || cur().pdf) return false;
+    const pos = hitBox(x, y);
+    if (pos < 0) return false;
+    e.preventDefault();
+    toggleBoxAt(pos);
+    return true;
+  }
+  el.body.addEventListener('touchstart', e => { if (e.touches.length === 1) boxTap(e, e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+  el.body.addEventListener('mousedown', e => { boxTap(e, e.clientX, e.clientY); });
+
+  let lastSel = null;
+  const rememberSel = () => { if (document.activeElement === el.body) lastSel = [el.body.selectionStart, el.body.selectionEnd, state.currentId]; };
+  ['keyup', 'mouseup', 'touchend', 'input', 'select', 'focus'].forEach(t => el.body.addEventListener(t, () => setTimeout(rememberSel, 0)));
+  document.addEventListener('selectionchange', rememberSel);
+
+  $('btnCheck').addEventListener('mousedown', e => e.preventDefault());
+  $('btnCheck').addEventListener('click', () => openCover(() => {
+    if (cur().pdf) { toast('Checklists go on typed pages. Tap New page for a page you can type on.'); return; }
+    if (penOn) setPen(false);
+    let v = el.body.value, s, e;
+    if (lastSel && lastSel[2] === state.currentId && lastSel[0] <= v.length) { [s, e] = lastSel; }
+    else {                                   // nothing chosen yet: start a checklist at the end of the page
+      if (v && !v.endsWith('\n')) v += '\n';
+      setBody(v + BOX + ' ', v.length + 2); el.body.focus(); rememberSel(); return;
+    }
+    const first = lineStartAt(v, s);
+    let lastEnd = v.indexOf('\n', Math.max(e, s) - (e > s && v[e - 1] === '\n' ? 1 : 0)); if (lastEnd < 0) lastEnd = v.length;
+    const lines = v.slice(first, lastEnd).split('\n');
+    const allBoxed = lines.every(l => BOX_RE.test(l) || !l.trim()) && lines.some(l => BOX_RE.test(l));
+    let delta0 = 0, total = 0;
+    const out = lines.map((l, i) => {
+      if (allBoxed) {
+        const m = BOX_RE.exec(l); if (!m) return l;
+        const cut = m[0].length + (l[m[0].length] === ' ' ? 1 : 0);
+        const d = cut - m[1].length; if (i === 0) delta0 = -d; total -= d;
+        return m[1] + l.slice(cut);
+      }
+      if (BOX_RE.test(l) || (!l.trim() && lines.length > 1)) return l;
+      const ind = /^[ \t]*/.exec(l)[0]; if (i === 0) delta0 = 2; total += 2;
+      return ind + BOX + ' ' + l.slice(ind.length);
+    }).join('\n');
+    const nv = v.slice(0, first) + out + v.slice(lastEnd);
+    setBody(nv, Math.max(first, s + delta0), Math.max(first, e + total));
+    el.body.focus(); rememberSel();
+  }));
+
+  // Return on a checklist line starts the next item; Return on an empty item ends the list
+  el.body.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing || el.body.selectionStart !== el.body.selectionEnd) return;
+    const v = el.body.value, pos = el.body.selectionStart, ls = lineStartAt(v, pos);
+    let le = v.indexOf('\n', pos); if (le < 0) le = v.length;
+    const line = v.slice(ls, le), m = BOX_RE.exec(line);
+    if (!m) return;
+    e.preventDefault();
+    const afterBox = line.slice(m[0].length).trim();
+    if (!afterBox && pos >= ls + m[0].length) {           // empty item: end the list
+      setBody(v.slice(0, ls) + m[1] + v.slice(le), ls + m[1].length);
+      return;
+    }
+    const ins = '\n' + m[1] + BOX + ' ';
+    setBody(v.slice(0, pos) + ins + v.slice(pos), pos + ins.length);
+  });
   el.body.addEventListener('scroll', () => { el.mirror.scrollTop = el.body.scrollTop; scheduleRedraw(); });
 
   el.prev.addEventListener('click', () => step(-1));

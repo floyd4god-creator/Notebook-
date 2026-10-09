@@ -144,7 +144,7 @@ body.pen .pen-badge{display:inline-flex}
 /* Section tabs */
 .tabs{position:absolute;top:26px;bottom:26px;right:0;width:42px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;scrollbar-width:none;z-index:0}
 .tabs::-webkit-scrollbar{display:none}
-.tab{flex:0 1 120px;min-height:48px;width:34px;border:0;border-radius:0 9px 9px 0;background:var(--c,#555);color:#FBF3E4;padding:10px 0;display:flex;align-items:center;justify-content:center;
+.tab{flex:0 1 170px;min-height:48px;width:34px;border:0;border-radius:0 9px 9px 0;background:var(--c,#555);color:#FBF3E4;padding:10px 0;display:flex;align-items:center;justify-content:center;
   box-shadow:inset 6px 0 8px -6px rgba(0,0,0,.55),2px 3px 8px -3px rgba(0,0,0,.6);opacity:.82;transition:width .2s,opacity .2s;overflow:hidden}
 .tab span{writing-mode:vertical-rl;font:600 13px/1 var(--sans);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:100%}
 .tab:hover{opacity:1}
@@ -396,7 +396,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     if (!Array.isArray(s.sections) && Array.isArray(s.pages)) s = migrate(s);
     if (!Array.isArray(s.sections) || !Array.isArray(s.pages)) return null;
     s.sections = s.sections.filter(x => x && typeof x.name === 'string')
-      .map((x, i) => ({ id:x.id || uid(), name:x.name || 'Untitled section', color:x.color || PALETTE[i % PALETTE.length] }));
+      .map((x, i) => ({ id:x.id || uid(), name:x.name || 'Untitled section', color:x.color || PALETTE[i % PALETTE.length], kind:x.kind === 'journal' ? 'journal' : undefined }));
     if (!s.sections.length) return null;
     const ids = new Set(s.sections.map(x => x.id)), now = Date.now();
     s.pages = s.pages.filter(p => p && typeof p.title === 'string' && typeof p.body === 'string').map(p => ({
@@ -430,6 +430,101 @@ body.closed .pager{opacity:0;pointer-events:none}
   }
   window.addEventListener('pagehide', () => { save(true); Ink.flush(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { save(true); Ink.flush(); } });
+
+
+  /* ---------- Manifestation Journal ---------- */
+  const JOURNAL_GUIDE = `This journal turns what you want into what you do. Each daily entry takes about 10 minutes: 5 in the morning, 5 at night.
+
+WHAT THE RESEARCH SUPPORTS
+Writing a clear, specific goal makes you more likely to act on it.
+Picturing the outcome feels good, but on its own it can lower effort. Picturing the outcome and then naming what stands in your way (called mental contrasting) leads to more follow-through.
+A plan written as "If this happens, then I will do that" works better than good intentions.
+Writing down things you're grateful for improves mood and outlook over time.
+Thoughts alone don't move events. What you think shapes what you notice, choose and do, and that's where results come from.
+
+THE DAILY PROCESS (tap New page while in this section to start today's entry)
+1. Gratitude: three specific things, not general ones.
+2. My aim: one outcome, written as if it's already true.
+3. Picture it: two or three sentences describing what it looks like when it's real.
+4. What could get in the way: the obstacle inside you (a habit, a fear, a feeling), not just the circumstances.
+5. My plan: If [that obstacle shows up], then I will [one specific action].
+6. Today's step: one small action you can finish today. Check it off when it's done.
+7. Evening check-in: what you did, what happened, and what you'll adjust.
+
+ONCE A WEEK
+Read back through the week's entries and answer three questions on a new page: Where did I make progress? Where did the same obstacle keep showing up? What one change will I make next week?
+
+ONCE A MONTH
+Reread "My Vision" and update it if your aim has changed.`;
+
+  const VISION_TEMPLATE = `What I want
+(one area of life, stated as a specific outcome)
+
+
+Why it matters to me
+
+
+The best result
+(what it looks, sounds and feels like when it's real)
+
+
+The main obstacle inside me
+
+
+My plan
+If ______, then I will ______.
+
+The affirmation or verse I'll come back to
+
+
+The date I'll review this
+`;
+
+  const ENTRY_TEMPLATE = `Gratitude
+1. 
+2. 
+3. 
+
+My aim
+
+
+Picture it
+
+
+What could get in the way
+
+
+My plan
+If ______, then I will ______.
+
+Today's step
+${'\u2610'} 
+
+Evening check-in
+What I did:
+What happened:
+What I'll adjust:
+`;
+
+  const todayTitle = () => new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  function journalEntry(sid){ const p = blank(sid); p.title = todayTitle(); p.body = ENTRY_TEMPLATE; return p; }
+  let journalJustAdded = false;
+  (function addJournalOnce(){
+    const FLAG = 'leatherNotebook.journalAdded';
+    try { if (localStorage.getItem(FLAG)) return; } catch (e) {}
+    if (!state.sections.some(s => s.kind === 'journal')) {
+      const used = state.sections.map(s => s.color);
+      const color = used.includes('#5B3A5E') ? (PALETTE.find(c => !used.includes(c)) || '#5B3A5E') : '#5B3A5E';
+      const s = { id:uid(), name:'Manifestation Journal', color, kind:'journal' };
+      const guide = blank(s.id); guide.title = 'How this journal works'; guide.body = JOURNAL_GUIDE;
+      const vision = blank(s.id); vision.title = 'My Vision'; vision.body = VISION_TEMPLATE;
+      state.sections.push(s);
+      state.pages.push(guide, vision, journalEntry(s.id));
+      journalJustAdded = true;
+      save(true);
+    }
+    try { localStorage.setItem(FLAG, '1'); } catch (e) {}
+  })();
 
   const cur = () => state.pages.find(p => p.id === state.currentId);
   const secById = id => state.sections.find(s => s.id === id);
@@ -1109,7 +1204,15 @@ body.closed .pager{opacity:0;pointer-events:none}
   el.next.addEventListener('click', () => step(1));
 
   $('btnNew').addEventListener('click', () => openCover(() => {
-    const c = cur(), p = blank(c.sectionId);
+    const c = cur(), sec = secById(c.sectionId);
+    if (sec.kind === 'journal') {
+      const existing = pagesIn(sec.id).find(x => x.title === todayTitle());
+      if (existing) { goTo(existing.id); toast("Today's entry is already started."); return; }
+      const e = journalEntry(sec.id), inSec = pagesIn(sec.id);
+      state.pages.splice(state.pages.indexOf(inSec[inSec.length - 1]) + 1, 0, e);
+      save(true); goTo(e.id); toast("Today's journal entry is ready."); return;
+    }
+    const p = blank(c.sectionId);
     const inSec = pagesIn(c.sectionId), last = inSec[inSec.length - 1];
     state.pages.splice(state.pages.indexOf(last) + 1, 0, p);
     save(true);
@@ -1390,6 +1493,7 @@ body.closed .pager{opacity:0;pointer-events:none}
   fit();
 
   render();
+  if (journalJustAdded) setTimeout(() => toast('A Manifestation Journal section has been added.'), 600);
 })();
 </script>
 </body>

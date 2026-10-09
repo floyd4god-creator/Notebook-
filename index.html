@@ -1024,7 +1024,7 @@ What I'll adjust:
     let line = '';
     const flush = () => { out.push(line); line = ''; };
     blocks.forEach(n => {
-      if (n.nodeType === 1 && /^(DIV|P)$/.test(n.tagName)) { if (line) flush(); out.push(n.innerText.replace(/\n$/, '')); }
+      if (n.nodeType === 1 && /^(DIV|P)$/.test(n.tagName)) { if (line) flush(); out.push(n.textContent); }
       else if (n.nodeName === 'BR') flush();
       else line += n.textContent;
     });
@@ -1681,7 +1681,10 @@ What I'll adjust:
     if (penOn && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoInk(); return; }
     if (penOn && e.key === 'Escape' && !drawerOpen) { setPen(false); return; }
     if (e.key === 'Escape' && drawerOpen) { closeDrawer(); return; }
-    if (drawerOpen || tag === 'input' || tag === 'textarea') return;
+    const typing = tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable) ||
+      el.body.contains(e.target) || document.activeElement === el.body;
+    if (typing && e.key === 'Escape' && document.activeElement === el.body) { el.body.blur(); document.body.classList.remove('editing'); return; }
+    if (drawerOpen || typing) return;   // arrow keys move the cursor while typing; they only turn pages when you're not typing
     if (!coverOpen && (e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ')) { if (e.target !== el.cover) { e.preventDefault(); openCover(); } return; }
     if (e.key === 'ArrowRight' || e.key === 'PageDown') step(1);
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') step(-1);

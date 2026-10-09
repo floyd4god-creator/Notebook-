@@ -13,7 +13,7 @@
 <title>Notebook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500;1,600&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Pinyon+Script&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500;1,600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,700&family=Pinyon+Script&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --desk:#2A211C; --bar:#1C1512; --bar-text:#F1E6D2; --desk-text:#CBBBA4;
@@ -94,6 +94,31 @@ svg{flex:none}
 .ghost .mirror .done{color:var(--muted)}
 .page-body{background:transparent;border:0;resize:none;color:var(--text);overflow-y:auto;outline:none;caret-color:var(--sec);-webkit-appearance:none;border-radius:0}
 .page-body::placeholder{color:var(--muted);opacity:.6}
+.mirror{display:none!important}
+.page-body{background-image:linear-gradient(to bottom,transparent 31px,var(--rule) 31px);background-size:100% 32px;background-position:0 6px;background-attachment:local}
+.page-body div,.page-body p{margin:0}
+.page-body:empty::before{content:attr(data-placeholder);color:var(--muted);opacity:.6;pointer-events:none}
+.page-body b,.page-body strong{font-weight:700}
+.page-body .done{text-decoration:line-through;text-decoration-color:var(--muted);text-decoration-thickness:1.5px;color:var(--muted)}
+.ghost-body{overflow:hidden}
+::highlight(search){background-color:var(--mark)}
+@media (prefers-color-scheme: dark){
+  .page-body font[color="#2a221c" i]{color:var(--text)}
+  .page-body font[color="#23458f" i]{color:#9DB8F2}
+  .page-body font[color="#a02c25" i]{color:#F0907F}
+  .page-body font[color="#2f6b46" i]{color:#8FD0A6}
+  .page-body font[color="#5b3a8e" i]{color:#C3A8F0}
+  .page-body font[color="#8a5a12" i]{color:#E2B868}
+}
+.fmt-tools{display:none;align-items:center;gap:2px}
+body.editing:not(.pen) .fmt-tools{display:flex}
+body.editing:not(.pen) .bar-actions{display:none}
+.fbtn{min-width:38px;height:40px;border:0;border-radius:9px;background:transparent;color:var(--bar-text);display:inline-flex;align-items:center;justify-content:center;font:600 18px/1 var(--serif);padding:0 8px}
+.fbtn:hover{background:rgba(255,255,255,.08)}
+.fbtn.on{background:rgba(255,255,255,.16);box-shadow:inset 0 0 0 1.5px var(--gold)}
+.fbtn.sw i{width:20px;height:20px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px rgba(255,255,255,.75)}
+.fsep{width:1px;height:24px;background:rgba(255,255,255,.15);margin:0 4px}
+@media (max-width:760px){.fbtn{min-width:32px;padding:0 5px}.fbtn.sw i{width:17px;height:17px}}
 
 .hl-chip{position:absolute;right:16px;bottom:14px;z-index:3;display:none;align-items:center;gap:10px;background:var(--bar);color:var(--bar-text);font-size:13px;padding:6px 6px 6px 14px;border-radius:999px;box-shadow:0 6px 18px -6px rgba(0,0,0,.5);max-width:calc(100% - 100px)}
 .hl-chip.on{display:inline-flex}
@@ -266,6 +291,22 @@ body.closed .pager{opacity:0;pointer-events:none}
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">New page</span>
     </button>
   </div>
+  <div class="fmt-tools" id="fmtTools" role="toolbar" aria-label="Text formatting">
+    <button class="fbtn" data-cmd="bold" aria-label="Bold"><b>B</b></button>
+    <button class="fbtn" data-cmd="italic" aria-label="Italic"><i style="font-family:var(--serif)">I</i></button>
+    <button class="fbtn" data-cmd="underline" aria-label="Underline"><u>U</u></button>
+    <span class="fsep"></span>
+    <button class="fbtn sw" data-color="#2a221c" aria-label="Black text"><i style="--c:#2A221C"></i></button>
+    <button class="fbtn sw" data-color="#23458f" aria-label="Blue text"><i style="--c:#23458F"></i></button>
+    <button class="fbtn sw" data-color="#a02c25" aria-label="Red text"><i style="--c:#A02C25"></i></button>
+    <button class="fbtn sw" data-color="#2f6b46" aria-label="Green text"><i style="--c:#2F6B46"></i></button>
+    <button class="fbtn sw" data-color="#5b3a8e" aria-label="Purple text"><i style="--c:#5B3A8E"></i></button>
+    <button class="fbtn sw" data-color="#8a5a12" aria-label="Gold text"><i style="--c:#B07A1E"></i></button>
+    <span class="fsep"></span>
+    <button class="fbtn" data-cmd="checklist" aria-label="Checklist"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="6" height="6" rx="1.2"/><path d="m4.5 7 1.2 1.2L8 5.9"/><rect x="3" y="14" width="6" height="6" rx="1.2"/><path d="M13 7h8M13 17h8"/></svg></button>
+    <button class="fbtn" data-cmd="removeFormat" aria-label="Clear formatting"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5h12M10 5 7 19M14 5l-1.5 7"/><path d="m15 15 5 5M20 15l-5 5"/></svg></button>
+    <button class="btn-primary" id="btnTypeDone">Done</button>
+  </div>
   <div class="pen-tools" id="penTools" role="toolbar" aria-label="Pen tools">
     <span class="pen-badge"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/></svg>Pen mode</span>
     <button class="tool" data-tool="pen" data-color="ink" aria-label="Black pen"><i style="--c:#1F1A16"></i></button>
@@ -293,8 +334,8 @@ body.closed .pager{opacity:0;pointer-events:none}
           <div class="page-meta"><span id="pageNum"></span><span id="pageDate"></span></div>
         </div>
         <div class="body-wrap">
-          <div class="mirror" id="mirror" aria-hidden="true"></div>
-          <textarea id="pageBody" class="page-body" placeholder="Start writing…" aria-label="Page notes"></textarea>
+          <div class="mirror" id="mirror" aria-hidden="true" hidden></div>
+          <div id="pageBody" class="page-body" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Page notes" data-placeholder="Start writing…" spellcheck="true" autocapitalize="sentences"></div>
           <div class="pdf-view" id="pdfView"><img id="pdfImg" alt=""></div>
           <canvas class="ink" id="ink"></canvas>
           <div class="hl-chip" id="hlChip"><span id="hlText"></span><button id="hlClear">Clear</button></div>
@@ -401,7 +442,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     const ids = new Set(s.sections.map(x => x.id)), now = Date.now();
     s.pages = s.pages.filter(p => p && typeof p.title === 'string' && typeof p.body === 'string').map(p => ({
       id:p.id || uid(), sectionId:ids.has(p.sectionId) ? p.sectionId : s.sections[0].id,
-      title:p.title, body:p.body, created:p.created || now, updated:p.updated || now,
+      title:p.title, body:p.body, html:typeof p.html === 'string' ? p.html : undefined, created:p.created || now, updated:p.updated || now,
       pdf:(p.pdf && typeof p.pdf === 'object') ? { name:String(p.pdf.name || 'PDF'), n:p.pdf.n | 0, of:p.pdf.of | 0 } : undefined }));
     s.sections.forEach(x => { if (!s.pages.some(p => p.sectionId === x.id)) s.pages.push(blank(x.id)); });
     if (!s.pages.some(p => p.id === s.currentId)) s.currentId = ordered(s)[0].id;
@@ -940,6 +981,57 @@ What I'll adjust:
   $('pdfInput').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importPdf(f); });
   PdfStore.ready.then(() => { if (cur() && cur().pdf) { const img = document.getElementById('pdfImg'); img.dataset.id = ''; showPdf(cur()); } });
 
+
+  /* ---------- Rich text helpers ---------- */
+  function textToHtml(t){
+    if (!t) return '';
+    return t.split('\n').map(l => {
+      const m = /^([ \t]*)\u2611/.exec(l);
+      return `<div${m ? ' class="done"' : ''}>${esc(l) || '<br>'}</div>`;
+    }).join('');
+  }
+  const ALLOWED = new Set(['DIV','P','BR','B','STRONG','I','EM','U','S','FONT','SPAN']);
+  function sanitize(html){
+    const t = document.createElement('template'); t.innerHTML = html || '';
+    (function walk(node){
+      [...node.childNodes].forEach(n => {
+        if (n.nodeType === 3) return;
+        if (n.nodeType !== 1 || !ALLOWED.has(n.tagName)) {
+          if (n.nodeType === 1 && !/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|LINK|META)$/.test(n.tagName)) { walk(n); n.replaceWith(...n.childNodes); }
+          else n.remove();
+          return;
+        }
+        [...n.attributes].forEach(a => {
+          const k = a.name.toLowerCase();
+          if (k === 'color' && n.tagName === 'FONT' && /^#[0-9a-f]{3,8}$/i.test(a.value)) return;
+          if (k === 'class' && a.value === 'done') return;
+          if (k === 'style') {
+            const keep = a.value.split(';').map(x => x.trim()).filter(x => /^(color|font-weight|font-style|text-decoration(-line)?)\s*:\s*[#\w\s(),.%-]+$/i.test(x)).join(';');
+            if (keep) { n.setAttribute('style', keep); return; }
+          }
+          n.removeAttribute(a.name);
+        });
+        walk(n);
+      });
+    })(t.content);
+    return t.innerHTML;
+  }
+  const pageHtml = p => sanitize(p.html != null ? p.html : textToHtml(p.body));
+  function bodyText(){
+    // one line per block, matching how the page looks
+    const out = [];
+    const blocks = [...el.body.childNodes];
+    let line = '';
+    const flush = () => { out.push(line); line = ''; };
+    blocks.forEach(n => {
+      if (n.nodeType === 1 && /^(DIV|P)$/.test(n.tagName)) { if (line) flush(); out.push(n.innerText.replace(/\n$/, '')); }
+      else if (n.nodeName === 'BR') flush();
+      else line += n.textContent;
+    });
+    if (line) flush();
+    return out.join('\n');
+  }
+
   /* ---------- Rendering ---------- */
   let query = '', pendingScroll = false;
   function countIn(text, ql){
@@ -968,9 +1060,23 @@ What I'll adjust:
     }).join('\n');
     return html + '\n\u200b';
   }
+  let hlRanges = [];
+  function paintHighlights(){
+    hlRanges = [];
+    const hasApi = window.CSS && CSS.highlights && window.Highlight;
+    if (hasApi) CSS.highlights.delete('search');
+    if (!query || cur().pdf) return;
+    const ql = query.toLowerCase();
+    const w = document.createTreeWalker(el.body, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = w.nextNode())) {
+      const lo = n.nodeValue.toLowerCase(); let i = 0;
+      while ((i = lo.indexOf(ql, i)) !== -1) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + ql.length); hlRanges.push(r); i += ql.length; }
+    }
+    if (hasApi && hlRanges.length) CSS.highlights.set('search', new Highlight(...hlRanges));
+  }
   function updateMirror(){
-    el.mirror.innerHTML = markup(el.body.value);
-    el.mirror.scrollTop = el.body.scrollTop;
+    paintHighlights();
     const p = cur(), ql = query.toLowerCase();
     el.pageTitle.classList.toggle('hit', !!query && p.title.toLowerCase().includes(ql));
     if (query) {
@@ -993,7 +1099,7 @@ What I'll adjust:
     showPdf(p);
     el.secLabel.textContent = sec.name;
     el.pageTitle.value = p.title;
-    el.body.value = p.body;
+    el.body.innerHTML = p.pdf ? '' : pageHtml(p);
     ensureInkSpace();
     el.body.scrollTop = keepScroll ? scroll : 0;
     el.pageNum.innerHTML = `Page <b>${pos}</b> of ${inSec.length}`;
@@ -1007,10 +1113,10 @@ What I'll adjust:
     if (pendingScroll) { pendingScroll = false; requestAnimationFrame(scrollToMark); }
   }
   function scrollToMark(){
-    const m = el.mirror.querySelector('mark');
-    if (!m) return;
-    el.body.scrollTop = Math.max(0, m.offsetTop - 96);
-    el.mirror.scrollTop = el.body.scrollTop;
+    const r = hlRanges[0];
+    if (!r) return;
+    const rr = r.getBoundingClientRect(), br = el.body.getBoundingClientRect(), s = br.width / W0 || 1;
+    el.body.scrollTop = Math.max(0, el.body.scrollTop + (rr.top - br.top) / s - 96);
   }
   function setTitle(){ document.title = state.title; el.coverTitle.textContent = state.title; }
 
@@ -1059,11 +1165,11 @@ What I'll adjust:
     g.innerHTML = `<div class="sheet-inner"><div class="margin-line"></div><div class="sheet-head"><div class="head-main"><div class="sec-label">${esc(sec.name)}</div>
       <div class="g-title${p.title ? '' : ' empty'}">${esc(p.title || 'Untitled page')}</div></div>
       <div class="page-meta"><span>Page <b>${inSec.indexOf(p) + 1}</b> of ${inSec.length}</span><span>Updated ${fmt(p.updated)}</span></div></div>
-      <div class="body-wrap"><div class="mirror">${markup(p.body)}</div>${p.pdf ? `<div class="pdf-view"><img alt="" src="${PdfStore.cached(p.id) || ''}"></div>` : ''}<canvas class="ink"></canvas></div></div>`;
+      <div class="body-wrap"><div class="page-body ghost-body">${p.pdf ? '' : pageHtml(p)}</div>${p.pdf ? `<div class="pdf-view"><img alt="" src="${PdfStore.cached(p.id) || ''}"></div>` : ''}<canvas class="ink"></canvas></div></div>`;
     if (p.pdf) g.classList.add('is-pdf');
     el.stack.appendChild(g);
-    const mir = g.querySelector('.mirror');
-    if (p.id === state.currentId) mir.style.paddingBottom = el.mirror.style.paddingBottom;
+    const mir = g.querySelector('.ghost-body');
+    if (p.id === state.currentId) mir.style.paddingBottom = el.body.style.paddingBottom;
     mir.scrollTop = scroll || 0;
     paint(g.querySelector('canvas'), Ink.get(p.id), mir.scrollTop);
     return g;
@@ -1111,93 +1217,212 @@ What I'll adjust:
   function touched(p){ p.updated = Date.now(); el.pageDate.textContent = 'Updated ' + fmt(p.updated); updateMirror(); save(); }
   el.pageTitle.addEventListener('input', () => { const p = cur(); p.title = el.pageTitle.value; touched(p); });
   el.pageTitle.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.body.focus(); } });
-  el.body.addEventListener('input', () => { const p = cur(); p.body = el.body.value; touched(p); });
+  el.body.addEventListener('input', () => afterEdit());
 
-  /* ---------- Checklists ---------- */
-  function setBody(value, selStart, selEnd){
-    el.body.value = value;
-    const p = cur(); p.body = value;
-    if (selStart != null) { try { el.body.setSelectionRange(selStart, selEnd == null ? selStart : selEnd); } catch (e) {} }
+  /* ---------- Editing, formatting and checklists ---------- */
+  const isBox = c => c === BOX || c === TICK;
+  function blockOf(node){
+    while (node && node.parentNode !== el.body) node = node.parentNode;
+    return node && node.parentNode === el.body ? node : null;
+  }
+  function ensureBlocks(){
+    // wrap loose text at the top level into line blocks so each line is its own <div>
+    if (![...el.body.childNodes].some(n => !(n.nodeType === 1 && /^(DIV|P)$/.test(n.tagName)))) return;
+    const sel = window.getSelection();
+    const keep = sel.rangeCount && el.body.contains(sel.anchorNode) ? [sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset] : null;
+    let group = [];
+    const kids = [...el.body.childNodes];
+    const wrap = before => {
+      if (!group.length) return;
+      const d = document.createElement('div');
+      el.body.insertBefore(d, before || null);
+      group.forEach(n => d.appendChild(n));
+      if (!d.textContent && !d.querySelector('br')) d.appendChild(document.createElement('br'));
+      group = [];
+    };
+    kids.forEach(n => {
+      if (n.nodeType === 1 && /^(DIV|P)$/.test(n.tagName)) { wrap(n); return; }
+      if (n.nodeName === 'BR') { group.push(n); wrap(n.nextSibling); return; }
+      group.push(n);
+    });
+    wrap(null);
+    if (keep && el.body.contains(keep[0]) && el.body.contains(keep[2])) { try { sel.setBaseAndExtent(keep[0], keep[1], keep[2], keep[3]); } catch (e) {} }
+  }
+  function firstText(block){
+    const w = document.createTreeWalker(block, NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode())) { if (/\S/.test(n.nodeValue)) return n; }
+    return null;
+  }
+  function boxInfo(block){
+    if (!block) return null;
+    const t = firstText(block); if (!t) return null;
+    const i = t.nodeValue.search(/\S/);
+    return isBox(t.nodeValue[i]) ? { node:t, index:i, checked:t.nodeValue[i] === TICK } : null;
+  }
+  function sweepDone(){
+    [...el.body.children].forEach(b => { const bi = boxInfo(b); b.classList.toggle('done', !!(bi && bi.checked)); if (!b.className) b.removeAttribute('class'); });
+  }
+  function afterEdit(){
+    if (cur().pdf) return;
+    sweepDone();
+    const p = cur(); p.body = bodyText();
+    p.html = p.body.trim() || el.body.querySelector('font,b,strong,i,em,u') ? el.body.innerHTML : '';
     touched(p);
   }
-  function lineStartAt(v, i){ return v.lastIndexOf('\n', i - 1) + 1; }
-  function toggleBoxAt(pos){
-    const v = el.body.value, ch = v[pos];
-    if (ch !== BOX && ch !== TICK) return;
-    const keepS = el.body.selectionStart, keepE = el.body.selectionEnd;
-    setBody(v.slice(0, pos) + (ch === BOX ? TICK : BOX) + v.slice(pos + 1), keepS, keepE);
+  function caretAfter(node, offset){
+    const sel = window.getSelection(), r = document.createRange();
+    r.setStart(node, offset); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
   }
-  function hitBox(x, y){
-    const spans = el.mirror.querySelectorAll('.cb');
-    for (const s of spans) {
-      const r = s.getBoundingClientRect(), slop = 8;
-      if (x >= r.left - slop && x <= r.right + slop && y >= r.top - 4 && y <= r.bottom + 4) return +s.dataset.pos;
-    }
-    return -1;
-  }
-  function boxTap(e, x, y){
-    if (penOn || cur().pdf) return false;
-    const pos = hitBox(x, y);
-    if (pos < 0) return false;
-    e.preventDefault();
-    toggleBoxAt(pos);
+
+  // remember where the cursor was, so toolbar buttons act on the right spot
+  let savedRange = null, savedPage = null;
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (sel.rangeCount && el.body.contains(sel.anchorNode)) { savedRange = sel.getRangeAt(0).cloneRange(); savedPage = state.currentId; updateFmtState(); }
+  });
+  function restoreSel(){
+    if (!savedRange || savedPage !== state.currentId || !el.body.contains(savedRange.startContainer)) return false;
+    if (document.activeElement !== el.body) el.body.focus({ preventScroll:true });
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange);
     return true;
   }
+  function caretToEnd(){
+    el.body.focus({ preventScroll:true });
+    const r = document.createRange(); r.selectNodeContents(el.body); r.collapse(false);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  }
+
+  // tap a box to check it off (without bringing up the keyboard)
+  function boxAtPoint(x, y){
+    let node = null, off = 0;
+    if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(x, y); if (r) { node = r.startContainer; off = r.startOffset; } }
+    else if (document.caretPositionFromPoint) { const c = document.caretPositionFromPoint(x, y); if (c) { node = c.offsetNode; off = c.offset; } }
+    if (!node || node.nodeType !== 3 || !el.body.contains(node)) return null;
+    const bi = boxInfo(blockOf(node));
+    if (!bi || bi.node !== node || (off !== bi.index && off !== bi.index + 1)) return null;
+    const r = document.createRange(); r.setStart(node, bi.index); r.setEnd(node, bi.index + 1);
+    const rect = r.getBoundingClientRect(), slop = 8;
+    if (x < rect.left - slop || x > rect.right + slop || y < rect.top - 6 || y > rect.bottom + 6) return null;
+    return bi;
+  }
+  function boxTap(e, x, y){
+    if (penOn || cur().pdf) return;
+    const bi = boxAtPoint(x, y); if (!bi) return;
+    e.preventDefault();
+    const v = bi.node.nodeValue;
+    bi.node.nodeValue = v.slice(0, bi.index) + (bi.checked ? BOX : TICK) + v.slice(bi.index + 1);
+    afterEdit();
+  }
   el.body.addEventListener('touchstart', e => { if (e.touches.length === 1) boxTap(e, e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
-  el.body.addEventListener('mousedown', e => { boxTap(e, e.clientX, e.clientY); });
+  el.body.addEventListener('mousedown', e => boxTap(e, e.clientX, e.clientY));
 
-  let lastSel = null;
-  const rememberSel = () => { if (document.activeElement === el.body) lastSel = [el.body.selectionStart, el.body.selectionEnd, state.currentId]; };
-  ['keyup', 'mouseup', 'touchend', 'input', 'select', 'focus'].forEach(t => el.body.addEventListener(t, () => setTimeout(rememberSel, 0)));
-  document.addEventListener('selectionchange', rememberSel);
-
-  $('btnCheck').addEventListener('mousedown', e => e.preventDefault());
-  $('btnCheck').addEventListener('click', () => openCover(() => {
+  function toggleChecklist(){
     if (cur().pdf) { toast('Checklists go on typed pages. Tap New page for a page you can type on.'); return; }
     if (penOn) setPen(false);
-    let v = el.body.value, s, e;
-    if (lastSel && lastSel[2] === state.currentId && lastSel[0] <= v.length) { [s, e] = lastSel; }
-    else {                                   // nothing chosen yet: start a checklist at the end of the page
-      if (v && !v.endsWith('\n')) v += '\n';
-      setBody(v + BOX + ' ', v.length + 2); el.body.focus(); rememberSel(); return;
+    if (!restoreSel() || !el.body.textContent.trim()) {
+      ensureBlocks();
+      let last = el.body.lastElementChild;
+      if (!last || last.textContent.trim()) { last = document.createElement('div'); el.body.appendChild(last); }
+      last.innerHTML = ''; const t = document.createTextNode(BOX + ' '); last.appendChild(t);
+      el.body.focus({ preventScroll:true }); caretAfter(t, 2); afterEdit(); return;
     }
-    const first = lineStartAt(v, s);
-    let lastEnd = v.indexOf('\n', Math.max(e, s) - (e > s && v[e - 1] === '\n' ? 1 : 0)); if (lastEnd < 0) lastEnd = v.length;
-    const lines = v.slice(first, lastEnd).split('\n');
-    const allBoxed = lines.every(l => BOX_RE.test(l) || !l.trim()) && lines.some(l => BOX_RE.test(l));
-    let delta0 = 0, total = 0;
-    const out = lines.map((l, i) => {
+    ensureBlocks();
+    const sel = window.getSelection(), r = sel.getRangeAt(0);
+    let first = blockOf(r.startContainer === el.body ? el.body.childNodes[Math.min(r.startOffset, el.body.childNodes.length - 1)] : r.startContainer);
+    let lastB = blockOf(r.endContainer === el.body ? el.body.childNodes[Math.max(0, Math.min(r.endOffset, el.body.childNodes.length) - 1)] : r.endContainer);
+    if (!first) first = lastB || el.body.firstElementChild;
+    if (!lastB) lastB = first;
+    const blocks = []; for (let b = first; b; b = b.nextElementSibling) { blocks.push(b); if (b === lastB) break; }
+    const nonEmpty = blocks.filter(b => b.textContent.trim());
+    const allBoxed = nonEmpty.length && nonEmpty.every(b => boxInfo(b));
+    let caretNode = null, caretOff = 0;
+    blocks.forEach(b => {
       if (allBoxed) {
-        const m = BOX_RE.exec(l); if (!m) return l;
-        const cut = m[0].length + (l[m[0].length] === ' ' ? 1 : 0);
-        const d = cut - m[1].length; if (i === 0) delta0 = -d; total -= d;
-        return m[1] + l.slice(cut);
+        const bi = boxInfo(b); if (!bi) return;
+        const v = bi.node.nodeValue, cut = bi.index + 1 + (v[bi.index + 1] === ' ' ? 1 : 0);
+        bi.node.nodeValue = v.slice(0, bi.index) + v.slice(cut);
+        b.classList.remove('done');
+        return;
       }
-      if (BOX_RE.test(l) || (!l.trim() && lines.length > 1)) return l;
-      const ind = /^[ \t]*/.exec(l)[0]; if (i === 0) delta0 = 2; total += 2;
-      return ind + BOX + ' ' + l.slice(ind.length);
-    }).join('\n');
-    const nv = v.slice(0, first) + out + v.slice(lastEnd);
-    setBody(nv, Math.max(first, s + delta0), Math.max(first, e + total));
-    el.body.focus(); rememberSel();
-  }));
+      if (boxInfo(b) || (!b.textContent.trim() && blocks.length > 1)) return;
+      const t = document.createTextNode(BOX + ' ');
+      const br = b.querySelector(':scope > br:only-child'); if (br) br.remove();
+      b.insertBefore(t, b.firstChild);
+      if (!caretNode) { caretNode = t; caretOff = 2; }
+    });
+    if (blocks.length === 1 && caretNode && !blocks[0].textContent.slice(2).trim()) caretAfter(caretNode, caretOff);
+    afterEdit();
+  }
+  $('btnCheck').addEventListener('mousedown', e => e.preventDefault());
+  $('btnCheck').addEventListener('click', () => openCover(toggleChecklist));
 
   // Return on a checklist line starts the next item; Return on an empty item ends the list
   el.body.addEventListener('keydown', e => {
-    if (e.key !== 'Enter' || e.shiftKey || e.isComposing || el.body.selectionStart !== el.body.selectionEnd) return;
-    const v = el.body.value, pos = el.body.selectionStart, ls = lineStartAt(v, pos);
-    let le = v.indexOf('\n', pos); if (le < 0) le = v.length;
-    const line = v.slice(ls, le), m = BOX_RE.exec(line);
-    if (!m) return;
-    e.preventDefault();
-    const afterBox = line.slice(m[0].length).trim();
-    if (!afterBox && pos >= ls + m[0].length) {           // empty item: end the list
-      setBody(v.slice(0, ls) + m[1] + v.slice(le), ls + m[1].length);
-      return;
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    const sel = window.getSelection(); if (!sel.rangeCount || !sel.isCollapsed) return;
+    ensureBlocks();
+    const block = blockOf(sel.anchorNode), bi = boxInfo(block);
+    if (!bi) return;
+    const after = block.textContent.slice(block.textContent.indexOf(bi.checked ? TICK : BOX) + 1).trim();
+    if (!after) {
+      e.preventDefault();
+      block.innerHTML = '<br>'; block.removeAttribute('class');
+      caretAfter(block, 0); afterEdit(); return;
     }
-    const ins = '\n' + m[1] + BOX + ' ';
-    setBody(v.slice(0, pos) + ins + v.slice(pos), pos + ins.length);
+    e.preventDefault();
+    document.execCommand('insertParagraph', false, null);
+    const nb = blockOf(window.getSelection().anchorNode);
+    if (nb && nb !== block) {
+      nb.removeAttribute('class');
+      if (!boxInfo(nb)) document.execCommand('insertText', false, BOX + ' ');
+    }
+    afterEdit();
   });
+
+  // paste as plain text so pasted pages keep the notebook's look
+  el.body.addEventListener('paste', e => {
+    const t = e.clipboardData && e.clipboardData.getData('text/plain');
+    if (t == null) return;
+    e.preventDefault();
+    document.execCommand('insertText', false, t);
+  });
+
+  // formatting toolbar (shows in the top bar while typing on a page)
+  let toolbarTouch = 0;
+  const fmtTools = $('fmtTools');
+  fmtTools.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+  fmtTools.addEventListener('pointerdown', () => { toolbarTouch = Date.now(); });
+  fmtTools.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'btnTypeDone') { el.body.blur(); document.body.classList.remove('editing'); return; }
+    if (b.dataset.cmd === 'checklist') { toggleChecklist(); return; }
+    if (!restoreSel()) caretToEnd();
+    try { document.execCommand('styleWithCSS', false, false); } catch (err) {}
+    if (b.dataset.color) document.execCommand('foreColor', false, b.dataset.color);
+    else document.execCommand(b.dataset.cmd, false, null);
+    afterEdit(); updateFmtState();
+  });
+  function updateFmtState(){
+    ['bold', 'italic', 'underline'].forEach(c => {
+      const btn = fmtTools.querySelector(`[data-cmd="${c}"]`);
+      let on = false; try { on = document.queryCommandState(c); } catch (e) {}
+      btn.classList.toggle('on', on);
+    });
+  }
+  try { document.execCommand('defaultParagraphSeparator', false, 'div'); } catch (e) {}
+  el.body.addEventListener('focus', () => {
+    if (cur().pdf) return;
+    document.body.classList.add('editing');
+    if (!el.body.firstChild) { el.body.innerHTML = '<div><br></div>'; caretAfter(el.body.firstChild, 0); }
+    else ensureBlocks();
+  });
+  el.body.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (document.activeElement === el.body || Date.now() - toolbarTouch < 500) return;
+      document.body.classList.remove('editing');
+    }, 200);
+  });
+
   el.body.addEventListener('scroll', () => { el.mirror.scrollTop = el.body.scrollTop; scheduleRedraw(); });
 
   el.prev.addEventListener('click', () => step(-1));

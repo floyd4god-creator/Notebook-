@@ -473,6 +473,9 @@ body.closed .pager{opacity:0;pointer-events:none}
   document.addEventListener('visibilitychange', () => { if (document.hidden) { save(true); Ink.flush(); } });
 
 
+  const cur = () => state.pages.find(p => p.id === state.currentId);
+  const secById = id => state.sections.find(s => s.id === id);
+  const pagesIn = sid => state.pages.filter(p => p.sectionId === sid);
   /* ---------- Manifestation Journal ---------- */
   const JOURNAL_GUIDE = `This journal turns what you want into what you do. Each daily entry takes about 10 minutes: 5 in the morning, 5 at night.
 
@@ -548,28 +551,155 @@ What I'll adjust:
 `;
 
   const todayTitle = () => new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' });
-  function journalEntry(sid){ const p = blank(sid); p.title = todayTitle(); p.body = ENTRY_TEMPLATE; return p; }
-  let journalJustAdded = false;
-  (function addJournalOnce(){
-    const FLAG = 'leatherNotebook.journalAdded';
+
+  /* ---------- Kaizen Journal (replaces the Manifestation Journal) ---------- */
+  // lines starting with # become bold headings
+  function tpl(lines){
+    const body = lines.map(l => l.replace(/^#/, '')).join('\n');
+    const html = lines.map(l => {
+      if (/^#/.test(l)) return `<div><b>${esc(l.slice(1))}</b></div>`;
+      return `<div>${esc(l) || '<br>'}</div>`;
+    }).join('');
+    return { body, html };
+  }
+  const KZ_GUIDE = [
+    'Kaizen means "change for the better." This journal follows the small-steps approach: improve one area of life a little each day, with steps so small your mind doesn\'t push back. Run it as a 30-day challenge, then start a new round.',
+    '',
+    '#Why small steps work',
+    'Big changes stir up resistance, so people put them off. A step that feels almost too easy gets done, and doing it every day builds the habit. Small steps add up: getting 1% better each day compounds over a year.',
+    '',
+    '#The daily loop: Plan, Do, Check, Act (about 5 minutes)',
+    'This is the improvement cycle used in industry and in the Navy\'s process improvement work.',
+    'Plan: in the morning, choose one small step for today. If it feels hard, make it smaller.',
+    'Do: decide when and where you\'ll do it. Then do it.',
+    'Check: in the evening, write how it went and what went well.',
+    'Act: write what would make tomorrow 1% better. Tomorrow\'s entry starts with that as its step.',
+    '',
+    '#Rules of the challenge',
+    '1. One focus area at a time. Write it on the "My Kaizen Focus" page.',
+    '2. Never skip two days in a row. Missing one day is human; missing two starts a new habit.',
+    '3. If you didn\'t do a step, don\'t blame yourself. Make the step smaller.',
+    '4. Count every small win. Progress you can see keeps you going.',
+    '',
+    '#Each week',
+    'On days 7, 14, 21 and 28 your entry adds a short weekly look-back.',
+    '',
+    '#Day 30',
+    'Reread your entries, update "My Kaizen Focus," and start a new round of 30 days, either the same focus with bigger steps or a new one.',
+    '',
+    '#How to start a day',
+    'Tap New page while you\'re in this section. It creates today\'s entry, numbers the day, and fills in yesterday\'s "1% better" idea as today\'s step.'
+  ];
+  const KZ_FOCUS = [
+    '#My focus area',
+    '(one area, stated specifically; for example: bringing in $3,696 in new income)',
+    '',
+    '#Why it matters to me',
+    '',
+    '',
+    '#Where I am today',
+    '(an honest starting point; for example: $0 of $3,696, no asks made yet)',
+    '',
+    '#My small question',
+    'What is one small thing I could do today to move toward this?',
+    '',
+    '#My first tiny step',
+    '(so small it feels almost too easy; for example: write down one name)',
+    '',
+    '#How I\'ll mark each small win',
+    '',
+    '',
+    '#The verse I\'ll come back to',
+    '',
+    '',
+    '#Day 1 of this round',
+    '',
+    '#Day 30 review date',
+    ''
+  ];
+  const KZ_HEADS = ['Plan: my one small step today', 'Do: when and where', 'Check: how it went', 'What went well', 'Act: 1% better tomorrow', 'Progress', 'Small win to celebrate', 'Weekly look-back'];
+  const isKzEntry = p => /^Day \d+ of 30/.test(p.body || '');
+  function lastActIdea(sid){
+    const prev = pagesIn(sid).filter(isKzEntry).pop();
+    if (!prev) return '';
+    const lines = prev.body.split('\n'), i = lines.indexOf('Act: 1% better tomorrow');
+    if (i < 0) return '';
+    for (let j = i + 1; j < lines.length && !KZ_HEADS.includes(lines[j]); j++) { const t = lines[j].trim(); if (t) return t.replace(/^[\u2610\u2611]\s*/, ''); }
+    return '';
+  }
+  function kaizenTemplate(day, step){
+    const lines = [
+      `#Day ${day} of 30`,
+      '',
+      '#Plan: my one small step today',
+      `\u2610 ${step || ''}`,
+      '',
+      '#Do: when and where',
+      'Today at ______, at ______.',
+      '',
+      '#Check: how it went',
+      '',
+      '',
+      '#What went well',
+      '',
+      '',
+      '#Act: 1% better tomorrow',
+      '',
+      '',
+      '#Progress',
+      '',
+      '#Small win to celebrate',
+      ''
+    ];
+    if (day % 7 === 0) lines.push('', '#Weekly look-back', 'Where did I make progress this week?', '', 'What kept getting in the way?', '', 'What one step will I make smaller or bigger next week?', '');
+    return tpl(lines);
+  }
+  function journalEntry(sid){
+    const day = pagesIn(sid).filter(isKzEntry).length + 1;
+    const t = kaizenTemplate(day, lastActIdea(sid));
+    const p = blank(sid); p.title = todayTitle(); p.body = t.body; p.html = t.html; return p;
+  }
+  let journalJustAdded = '';
+  (function setupKaizen(){
+    const FLAG = 'leatherNotebook.kaizenAdded';
     try { if (localStorage.getItem(FLAG)) return; } catch (e) {}
-    if (!state.sections.some(s => s.kind === 'journal')) {
-      const used = state.sections.map(s => s.color);
-      const color = used.includes('#5B3A5E') ? (PALETTE.find(c => !used.includes(c)) || '#5B3A5E') : '#5B3A5E';
-      const s = { id:uid(), name:'Manifestation Journal', color, kind:'journal' };
-      const guide = blank(s.id); guide.title = 'How this journal works'; guide.body = JOURNAL_GUIDE;
-      const vision = blank(s.id); vision.title = 'My Vision'; vision.body = VISION_TEMPLATE;
+    const untouched = (p, title, body) => p.title === title && p.body === body && !p.html;
+    const g = tpl(KZ_GUIDE), f = tpl(KZ_FOCUS);
+    let s = state.sections.find(x => x.kind === 'journal');
+    if (!s) {
+      const used = state.sections.map(x => x.color);
+      s = { id:uid(), name:'Kaizen Journal', color:used.includes('#5B3A5E') ? (PALETTE.find(c => !used.includes(c)) || '#5B3A5E') : '#5B3A5E', kind:'journal' };
       state.sections.push(s);
-      state.pages.push(guide, vision, journalEntry(s.id));
-      journalJustAdded = true;
-      save(true);
+      journalJustAdded = 'added';
+    } else {
+      if (s.name === 'Manifestation Journal') s.name = 'Kaizen Journal';
+      journalJustAdded = 'replaced';
     }
-    try { localStorage.setItem(FLAG, '1'); } catch (e) {}
+    const pages = pagesIn(s.id);
+    // guide page: replace the old one if it was never edited, otherwise put the new guide first
+    const oldGuide = pages.find(p => untouched(p, 'How this journal works', JOURNAL_GUIDE));
+    let guide = oldGuide || blank(s.id);
+    guide.title = 'How the Kaizen Journal works'; guide.body = g.body; guide.html = g.html; guide.updated = Date.now();
+    // focus page: replace an unedited "My Vision", otherwise add a new page
+    const oldVision = pages.find(p => untouched(p, 'My Vision', VISION_TEMPLATE));
+    let focus = oldVision || blank(s.id);
+    focus.title = 'My Kaizen Focus'; focus.body = f.body; focus.html = f.html; focus.updated = Date.now();
+    // unedited manifestation entries become Kaizen entries; anything you wrote stays as it is
+    const blanks = pages.filter(p => p.body === ENTRY_TEMPLATE && !p.html);
+    const others = pages.filter(p => p !== oldGuide && p !== oldVision && !blanks.includes(p));
+    let day = 0;
+    blanks.forEach(p => { const t = kaizenTemplate(++day, ''); p.body = t.body; p.html = t.html; });
+    const entries = blanks.length ? blanks : [];
+    // rebuild the section order: guide, focus, your own pages, then Kaizen entries
+    state.pages = state.pages.filter(p => p.sectionId !== s.id);
+    const ordered = [guide, focus, ...others, ...entries];
+    if (!entries.length) { state.pages.push(...ordered); const e = journalEntry(s.id); ordered.push(e); state.pages.push(e); }
+    else state.pages.push(...ordered);
+    if (!state.pages.some(p => p.id === state.currentId)) state.currentId = guide.id;
+    save(true);
+    try { localStorage.setItem(FLAG, '1'); localStorage.setItem('leatherNotebook.journalAdded', '1'); } catch (e) {}
   })();
 
-  const cur = () => state.pages.find(p => p.id === state.currentId);
-  const secById = id => state.sections.find(s => s.id === id);
-  const pagesIn = sid => state.pages.filter(p => p.sectionId === sid);
 
 
   /* ---------- Handwriting (Pen mode) ---------- */
@@ -1431,11 +1561,11 @@ What I'll adjust:
   $('btnNew').addEventListener('click', () => openCover(() => {
     const c = cur(), sec = secById(c.sectionId);
     if (sec.kind === 'journal') {
-      const existing = pagesIn(sec.id).find(x => x.title === todayTitle());
+      const existing = pagesIn(sec.id).find(x => x.title === todayTitle() && isKzEntry(x));
       if (existing) { goTo(existing.id); toast("Today's entry is already started."); return; }
       const e = journalEntry(sec.id), inSec = pagesIn(sec.id);
       state.pages.splice(state.pages.indexOf(inSec[inSec.length - 1]) + 1, 0, e);
-      save(true); goTo(e.id); toast("Today's journal entry is ready."); return;
+      save(true); goTo(e.id); toast(`Day ${pagesIn(sec.id).filter(isKzEntry).length} of your Kaizen challenge is ready.`); return;
     }
     const p = blank(c.sectionId);
     const inSec = pagesIn(c.sectionId), last = inSec[inSec.length - 1];
@@ -1721,7 +1851,7 @@ What I'll adjust:
   fit();
 
   render();
-  if (journalJustAdded) setTimeout(() => toast('A Manifestation Journal section has been added.'), 600);
+  if (journalJustAdded) setTimeout(() => toast(journalJustAdded === 'replaced' ? 'Your journal section is now the Kaizen Journal.' : 'A Kaizen Journal section has been added.'), 600);
 })();
 </script>
 </body>

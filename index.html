@@ -469,7 +469,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     };
     if (now) write(); else saveTimer = setTimeout(write, 350);
   }
-  window.addEventListener('pagehide', () => { save(true); Ink.flush(); });
+  window.addEventListener('pagehide', () => { save(true); Ink.flush(); try { localStorage.setItem('leatherNotebook.view', JSON.stringify(view)); } catch (e) {} });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { save(true); Ink.flush(); } });
 
 
@@ -1221,6 +1221,21 @@ What I'll adjust:
       `<button class="tab${s.id === sid ? ' active' : ''}" data-sid="${s.id}" style="--c:${s.color}" aria-label="${esc(s.name)} section"${s.id === sid ? ' aria-current="true"' : ''}><span>${esc(s.name)}</span></button>`
     ).join('') + '<button class="tab add" data-add="1" aria-label="Add section">+</button>';
   }
+  /* ---------- Remember where you left off ---------- */
+  const VIEW_KEY = 'leatherNotebook.view';
+  let view = { lastBySec:{}, scroll:null, closed:false };
+  try { const v = JSON.parse(localStorage.getItem(VIEW_KEY) || 'null'); if (v && typeof v === 'object') view = Object.assign(view, v); } catch (e) {}
+  let viewTimer = null;
+  function saveView(now){
+    clearTimeout(viewTimer);
+    const w = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (e) {} };
+    if (now) w(); else viewTimer = setTimeout(w, 300);
+  }
+  function lastPageIn(sid){
+    const id = view.lastBySec[sid], ps = pagesIn(sid);
+    return ps.find(p => p.id === id) || ps[0];
+  }
+
   function render(keepScroll){
     const p = cur(), sec = secById(p.sectionId), inSec = pagesIn(sec.id), pos = inSec.indexOf(p) + 1;
     const list = ordered(), idx = list.indexOf(p), scroll = el.body.scrollTop;
@@ -1240,6 +1255,9 @@ What I'll adjust:
     renderTabs();
     updateMirror();
     redrawInk(); updateTools();
+    view.lastBySec[p.sectionId] = p.id;
+    if (!keepScroll) view.scroll = { id:p.id, top:0 };
+    saveView();
     if (pendingScroll) { pendingScroll = false; requestAnimationFrame(scrollToMark); }
   }
   function scrollToMark(){
@@ -1257,7 +1275,7 @@ What I'll adjust:
     if (coverOpen) { if (then) then(); return; }
     if (coverBusy) return;
     document.body.classList.remove('closed');
-    const fin = () => { el.cover.hidden = true; el.cover.classList.remove('opening'); coverOpen = true; coverBusy = false; if (then) then(); };
+    const fin = () => { el.cover.hidden = true; el.cover.classList.remove('opening'); coverOpen = true; coverBusy = false; view.closed = false; saveView(true); if (then) then(); };
     if (reduced()) { fin(); return; }
     coverBusy = true;
     let done = false;
@@ -1272,7 +1290,7 @@ What I'll adjust:
     if (penOn) setPen(false);
     const a = document.activeElement; if (a && a.blur) a.blur();
     save(true);
-    coverOpen = false;
+    coverOpen = false; view.closed = true; saveView(true);
     el.cover.hidden = false;
     document.body.classList.add('closed');
     if (reduced()) return;
@@ -1553,7 +1571,7 @@ What I'll adjust:
     }, 200);
   });
 
-  el.body.addEventListener('scroll', () => { el.mirror.scrollTop = el.body.scrollTop; scheduleRedraw(); });
+  el.body.addEventListener('scroll', () => { el.mirror.scrollTop = el.body.scrollTop; scheduleRedraw(); view.scroll = { id:state.currentId, top:Math.round(el.body.scrollTop) }; saveView(); });
 
   el.prev.addEventListener('click', () => step(-1));
   el.next.addEventListener('click', () => step(1));
@@ -1597,7 +1615,7 @@ What I'll adjust:
     const b = e.target.closest('.tab'); if (!b) return;
     if (b.dataset.add) { openCover(() => addSection()); return; }
     const sid = b.dataset.sid;
-    openCover(() => { if (cur().sectionId !== sid) goTo(pagesIn(sid)[0].id); });
+    openCover(() => { if (cur().sectionId !== sid) goTo(lastPageIn(sid).id); });
   });
   function addSection(){
     const used = state.sections.map(s => s.color);
@@ -1850,7 +1868,14 @@ What I'll adjust:
   window.addEventListener('orientationchange', () => setTimeout(fit, 250));
   fit();
 
+  if (!view.closed) { el.cover.hidden = true; coverOpen = true; document.body.classList.remove('closed'); }
+  const resumeScroll = view.scroll && view.scroll.id === state.currentId ? view.scroll.top : 0;
   render();
+  if (resumeScroll) {
+    const restore = () => { ensureInkSpace(); el.body.scrollTop = resumeScroll; redrawInk(); };
+    requestAnimationFrame(restore);
+    Ink.ready.then(() => requestAnimationFrame(restore));
+  }
   if (journalJustAdded) setTimeout(() => toast(journalJustAdded === 'replaced' ? 'Your journal section is now the Kaizen Journal.' : 'A Kaizen Journal section has been added.'), 600);
 })();
 </script>

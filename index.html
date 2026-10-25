@@ -437,7 +437,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     if (!Array.isArray(s.sections) && Array.isArray(s.pages)) s = migrate(s);
     if (!Array.isArray(s.sections) || !Array.isArray(s.pages)) return null;
     s.sections = s.sections.filter(x => x && typeof x.name === 'string')
-      .map((x, i) => ({ id:x.id || uid(), name:x.name || 'Untitled section', color:x.color || PALETTE[i % PALETTE.length], kind:x.kind === 'journal' ? 'journal' : undefined }));
+      .map((x, i) => ({ id:x.id || uid(), name:x.name || 'Untitled section', color:x.color || PALETTE[i % PALETTE.length], kind:(x.kind === 'journal' || x.kind === '369') ? x.kind : undefined }));
     if (!s.sections.length) return null;
     const ids = new Set(s.sections.map(x => x.id)), now = Date.now();
     s.pages = s.pages.filter(p => p && typeof p.title === 'string' && typeof p.body === 'string').map(p => ({
@@ -698,6 +698,89 @@ What I'll adjust:
     if (!state.pages.some(p => p.id === state.currentId)) state.currentId = guide.id;
     save(true);
     try { localStorage.setItem(FLAG, '1'); localStorage.setItem('leatherNotebook.journalAdded', '1'); } catch (e) {}
+  })();
+
+  /* ---------- 3-6-9 Journal ---------- */
+  const G369 = [
+    'The 3-6-9 method is a daily writing practice: you write one affirmation 3 times in the morning, 6 times in the afternoon and 9 times in the evening, for 33 days in a row.',
+    '',
+    '#An honest word about it',
+    'The method is often credited to Nikola Tesla, but there\'s no record he taught it; it spread online in recent years. Writing an affirmation doesn\'t make things happen on its own. What it does well is keep your aim in front of you three times a day, so you notice chances and act on them. That\'s why each entry ends with one action. Pair it with your Kaizen Journal: 3-6-9 keeps the aim in mind, Kaizen keeps the steps moving.',
+    '',
+    '#Writing a strong affirmation',
+    'Present tense: "I am" or "I have," not "I will."',
+    'Specific: name the amount, the date or the result.',
+    'Believable: something you can say without arguing with yourself. If it feels false, add "I am becoming" or "I am open to."',
+    'Short: one sentence you can write quickly 9 times.',
+    'Example: "I am grateful that $3,696 in new income has come to me through my teaching and speaking."',
+    '',
+    '#Each day',
+    'Morning: write it 3 times.',
+    'Afternoon: write it 6 times.',
+    'Evening: write it 9 times, then note one action you took toward it.',
+    'Writing by hand with the Pen works especially well for this, because writing slowly makes you think about each word. Typing or Scribble works too.',
+    '',
+    '#The rules',
+    '1. Keep the same affirmation for all 33 days.',
+    '2. Write it, don\'t just copy and paste it.',
+    '3. If you miss a day, don\'t start over in guilt. Pick up the next day and keep going.',
+    '4. On day 33, reread your entries and write what changed and what you did.',
+    '',
+    '#How to start a day',
+    'Tap New page while you\'re in this section. It makes today\'s entry, numbers the day, and carries your affirmation over from yesterday.'
+  ];
+  const isE369 = p => /^Day \d+ of 33/.test(p.body || '');
+  function lastAffirmation(sid){
+    const prev = pagesIn(sid).filter(isE369).pop();
+    if (!prev) return '';
+    const lines = prev.body.split('\n'), i = lines.indexOf('My affirmation');
+    if (i < 0) return '';
+    for (let j = i + 1; j < lines.length && !/^(Morning|Afternoon|Evening|One action)/.test(lines[j]); j++) { const t = lines[j].trim(); if (t) return t; }
+    return '';
+  }
+  function entry369(sid){
+    const n = pagesIn(sid).filter(isE369).length + 1;
+    const day = ((n - 1) % 33) + 1, round = Math.floor((n - 1) / 33) + 1;
+    const nums = k => Array.from({ length:k }, (_, i) => `${i + 1}. `);
+    const lines = [
+      `#Day ${day} of 33${round > 1 ? ` (round ${round})` : ''}`,
+      '',
+      '#My affirmation',
+      lastAffirmation(sid),
+      '',
+      '#Morning: write it 3 times',
+      ...nums(3),
+      '',
+      '#Afternoon: write it 6 times',
+      ...nums(6),
+      '',
+      '#Evening: write it 9 times',
+      ...nums(9),
+      '',
+      '#One action I took toward it today',
+      '\u2610 '
+    ];
+    if (day === 33) lines.push('', '#Day 33 look-back', 'What changed over these 33 days?', '', 'What did I do that made a difference?', '', 'What will I focus on next?', '');
+    const t = tpl(lines), p = blank(sid);
+    p.title = todayTitle(); p.body = t.body; p.html = t.html;
+    return p;
+  }
+  let added369 = false;
+  (function setup369(){
+    const FLAG = 'leatherNotebook.369Added';
+    try { if (localStorage.getItem(FLAG)) return; } catch (e) {}
+    if (!state.sections.some(s => s.kind === '369')) {
+      const used = state.sections.map(s => s.color);
+      const color = PALETTE.find(c => !used.includes(c)) || '#4A5A63';
+      const s = { id:uid(), name:'3-6-9 Journal', color, kind:'369' };
+      const g = tpl(G369), guide = blank(s.id);
+      guide.title = 'How the 3-6-9 Journal works'; guide.body = g.body; guide.html = g.html;
+      state.sections.push(s);
+      state.pages.push(guide, entry369(s.id));
+      added369 = true;
+      save(true);
+    }
+    try { localStorage.setItem(FLAG, '1'); } catch (e) {}
   })();
 
 
@@ -1578,6 +1661,13 @@ What I'll adjust:
 
   $('btnNew').addEventListener('click', () => openCover(() => {
     const c = cur(), sec = secById(c.sectionId);
+    if (sec.kind === '369') {
+      const existing = pagesIn(sec.id).find(x => x.title === todayTitle() && isE369(x));
+      if (existing) { goTo(existing.id); toast("Today's 3-6-9 entry is already started."); return; }
+      const e = entry369(sec.id), inSec = pagesIn(sec.id);
+      state.pages.splice(state.pages.indexOf(inSec[inSec.length - 1]) + 1, 0, e);
+      save(true); goTo(e.id); toast('Today\'s 3-6-9 entry is ready.'); return;
+    }
     if (sec.kind === 'journal') {
       const existing = pagesIn(sec.id).find(x => x.title === todayTitle() && isKzEntry(x));
       if (existing) { goTo(existing.id); toast("Today's entry is already started."); return; }
@@ -1876,6 +1966,7 @@ What I'll adjust:
     requestAnimationFrame(restore);
     Ink.ready.then(() => requestAnimationFrame(restore));
   }
+  if (added369) setTimeout(() => toast('A 3-6-9 Journal section has been added.'), 3600);
   if (journalJustAdded) setTimeout(() => toast(journalJustAdded === 'replaced' ? 'Your journal section is now the Kaizen Journal.' : 'A Kaizen Journal section has been added.'), 600);
 })();
 </script>

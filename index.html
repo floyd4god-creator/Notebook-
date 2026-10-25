@@ -877,6 +877,19 @@ What I'll adjust:
     return ctx;
   }
 
+  /* Palm rejection: a resting hand makes a much larger contact than a fingertip, and
+     while the Apple Pencil is writing (or hovering, on iPads that support it) other touches are ignored. */
+  let lastPenAny = 0;
+  const PALM_RADIUS = 20;          // CSS px; fingertips are usually 8–15, palms 25+
+  const PEN_QUIET_MS = 1500;       // ignore hand touches this long after the Pencil was last used
+  const markPen = () => { lastPenAny = Date.now(); };
+  document.addEventListener('pointerdown', e => { if (e.pointerType === 'pen') markPen(); }, true);
+  document.addEventListener('pointermove', e => { if (e.pointerType === 'pen') markPen(); }, true);
+  document.addEventListener('touchstart', e => { for (const t of e.touches) if (t.touchType === 'stylus') { markPen(); break; } }, { capture:true, passive:true });
+  const penRecent = () => Date.now() - lastPenAny < PEN_QUIET_MS;
+  const touchIsPalm = t => (t.radiusX || 0) > PALM_RADIUS || (t.radiusY || 0) > PALM_RADIUS;
+  const pointerIsPalm = e => e.pointerType === 'touch' && ((e.width || 0) > PALM_RADIUS * 2 || (e.height || 0) > PALM_RADIUS * 2);
+
   let penOn = false, tool = 'pen', color = 'ink', live = null, liveCtx = null, activePointer = null, lastPen = 0;
   let erasing = false, erasedAny = false, touchScroll = null, rafPending = false;
   try { const t = JSON.parse(localStorage.getItem('leatherNotebook.pen') || '{}'); if (t.tool) tool = t.tool; if (t.color) color = t.color; } catch (e) {}
@@ -973,15 +986,15 @@ What I'll adjust:
   el.ink.addEventListener('pointerdown', e => {
     if (!penOn) return;
     if (e.pointerType === 'touch') {
-      if (activePointer !== null || Date.now() - lastPen < 600 || touchScroll) return;   // palm rejection
-      touchScroll = { id:e.pointerId, y:e.clientY };
+      if (activePointer !== null || penRecent() || pointerIsPalm(e) || touchScroll) return;   // palm rejection
+      touchScroll = { id:e.pointerId, y:e.clientY, startTop:el.body.scrollTop };
       return;
     }
     if (activePointer !== null) return;
     e.preventDefault();
     activePointer = e.pointerId; lastPen = Date.now();
     try { el.ink.setPointerCapture(e.pointerId); } catch (err) {}
-    touchScroll = null;
+    if (touchScroll) { el.body.scrollTop = touchScroll.startTop; touchScroll = null; }   // undo any drift a resting hand caused just before writing
     const [x, y] = toPoint(e);
     if (tool === 'eraser') { erasing = true; erasedAny = false; eraseAt(x, y); return; }
     live = { t:tool === 'hl' ? 'hl' : 'pen', c:color, w:tool === 'hl' ? 16 : 2.3, d:[r1(x), r1(y), pressureOf(e)] };
@@ -989,7 +1002,7 @@ What I'll adjust:
   });
   el.ink.addEventListener('pointermove', e => {
     if (touchScroll && e.pointerId === touchScroll.id) {
-      if (Date.now() - lastPen < 600) return;
+      if (penRecent() || pointerIsPalm(e)) { el.body.scrollTop = touchScroll.startTop; touchScroll = null; return; }
       const s = el.ink.getBoundingClientRect().width / W0;
       el.body.scrollTop -= (e.clientY - touchScroll.y) / s; touchScroll.y = e.clientY;
       return;
@@ -1544,7 +1557,7 @@ What I'll adjust:
     bi.node.nodeValue = v.slice(0, bi.index) + (bi.checked ? BOX : TICK) + v.slice(bi.index + 1);
     afterEdit();
   }
-  el.body.addEventListener('touchstart', e => { if (e.touches.length === 1) boxTap(e, e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+  el.body.addEventListener('touchstart', e => { if (e.touches.length === 1 && !touchIsPalm(e.touches[0])) boxTap(e, e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
   el.body.addEventListener('mousedown', e => boxTap(e, e.clientX, e.clientY));
 
   function toggleChecklist(){
@@ -1904,11 +1917,13 @@ What I'll adjust:
   el.stack.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) { tracking = false; return; }
     const t = e.touches[0];
-    if (t.touchType === 'stylus') { tracking = false; return; }   // Apple Pencil writes; only fingers turn pages
+    if (t.touchType === 'stylus' || touchIsPalm(t) || penRecent()) { tracking = false; return; }   // only a fingertip turns pages
     sx = t.clientX; sy = t.clientY; st = Date.now(); tracking = true;
   }, {passive:true});
+  el.stack.addEventListener('touchmove', e => { if (tracking && (e.touches.length !== 1 || touchIsPalm(e.touches[0]))) tracking = false; }, {passive:true});
   el.stack.addEventListener('touchend', e => {
     if (!tracking) return; tracking = false;
+    if (penRecent() || lastPenAny > st) return;
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
     if (Date.now() - st < 700 && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.6) step(dx < 0 ? 1 : -1);
   }, {passive:true});

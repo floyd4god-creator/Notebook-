@@ -99,6 +99,34 @@ svg{flex:none}
 .page-body div,.page-body p{margin:0}
 .page-body:empty::before{content:attr(data-placeholder);color:var(--muted);opacity:.6;pointer-events:none}
 .page-body b,.page-body strong{font-weight:700}
+.page-body .ph{font:600 13px/32px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:#2C3E5C;background:rgba(44,62,92,.09);border-radius:4px;padding-left:8px;margin-right:-8px}
+@media (prefers-color-scheme: dark){.page-body .ph{color:#B9C8E2;background:rgba(160,185,230,.12)}}
+.page-body.planner{--pl:#2C3E5C;--pl-band:rgba(44,62,92,.08);--pl-line:#C9D1DC;padding:18px 26px 40px;background-image:none;white-space:normal;font-family:var(--sans)}
+@media (prefers-color-scheme: dark){.page-body.planner{--pl:#B9C8E2;--pl-band:rgba(160,185,230,.12);--pl-line:var(--rule)}}
+.sheet.is-planner .sheet-head,.sheet.is-planner .margin-line{display:none}
+.page-body.planner .pl-head{display:flex;gap:16px;align-items:center;margin-bottom:12px}
+.pl-head img{width:78px;height:auto;flex:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.2))}
+.pl-title{font:700 26px/1.1 var(--sans);letter-spacing:.02em;color:var(--pl);text-transform:uppercase}
+.page-body.planner .pl-dd{display:flex;gap:16px;margin-top:8px}
+.pl-dd div{flex:1;display:flex;gap:8px;align-items:flex-end;font:500 11px/1 var(--sans);letter-spacing:.06em;color:var(--muted)}
+.pl-dd b{flex:1;font:400 16px/1.2 var(--serif);letter-spacing:0;color:var(--text);border-bottom:1px solid var(--pl-line);padding:0 2px 2px}
+.page-body.planner .pl-mot{border-top:1px solid var(--pl-line);border-bottom:1px solid var(--pl-line);padding:10px 6px 11px;margin-bottom:16px;text-align:center}
+.pl-mot small{display:block;font:600 11px/1 var(--sans);letter-spacing:.07em;color:var(--pl);margin-bottom:6px}
+.pl-mot p{margin:0;font:italic 400 18px/1.4 var(--serif);color:var(--text)}
+.page-body.planner .pl-cols{display:grid;grid-template-columns:minmax(0,42fr) minmax(0,58fr);gap:18px}
+.page-body.planner .pl-h{background:var(--pl-band);font:600 11px/1 var(--sans);letter-spacing:.07em;color:var(--pl);padding:8px 8px;margin:0 0 4px;text-transform:uppercase}
+.page-body.planner .pl-sp{margin-top:16px}
+.page-body.planner .pl-row{display:flex;align-items:flex-end;gap:8px;height:26px}
+.pl-in{flex:1;min-width:0;border:0;border-bottom:1px solid var(--pl-line);background:transparent;font:400 16px/1.2 var(--serif);color:var(--text);padding:0 2px 2px;height:22px;border-radius:0;outline:none;-webkit-appearance:none;box-shadow:none}
+.pl-in:focus{border-bottom-color:var(--pl)}
+.pl-cb{width:16px;height:16px;border:1.5px solid var(--muted);border-radius:3px;background:transparent;flex:none;margin-bottom:5px;padding:0;position:relative}
+.pl-cb.on{background:var(--pl);border-color:var(--pl)}
+.pl-cb.on::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid var(--paper);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.pl-row.done .pl-in{text-decoration:line-through;color:var(--muted)}
+.pl-time{font:400 12px/1 var(--sans);color:var(--muted);width:30px;flex:none;padding-bottom:6px}
+.page-body.planner .pl-lb{font:600 12px/1 var(--sans);color:var(--pl);margin-top:10px}
+.page-body.planner .pl-notes{min-height:96px;font:400 16px/24px var(--serif);color:var(--text);background-image:linear-gradient(to bottom,transparent 23px,var(--pl-line) 23px);background-size:100% 24px;outline:none;padding:0 2px;white-space:pre-wrap;margin-top:4px}
+.pl-notes:empty::before{content:"Write as much as you need. The notes grow as you write.";color:var(--muted);opacity:.7}
 .page-body .done{text-decoration:line-through;text-decoration-color:var(--muted);text-decoration-thickness:1.5px;color:var(--muted)}
 .ghost-body{overflow:hidden}
 ::highlight(search){background-color:var(--mark)}
@@ -437,12 +465,14 @@ body.closed .pager{opacity:0;pointer-events:none}
     if (!Array.isArray(s.sections) && Array.isArray(s.pages)) s = migrate(s);
     if (!Array.isArray(s.sections) || !Array.isArray(s.pages)) return null;
     s.sections = s.sections.filter(x => x && typeof x.name === 'string')
-      .map((x, i) => ({ id:x.id || uid(), name:x.name || 'Untitled section', color:x.color || PALETTE[i % PALETTE.length], kind:(x.kind === 'journal' || x.kind === '369') ? x.kind : undefined }));
+      .map((x, i) => ({ id:x.id || uid(), name:x.name || 'Untitled section', color:x.color || PALETTE[i % PALETTE.length], kind:['journal', '369', 'planner'].includes(x.kind) ? x.kind : undefined }));
     if (!s.sections.length) return null;
     const ids = new Set(s.sections.map(x => x.id)), now = Date.now();
     s.pages = s.pages.filter(p => p && typeof p.title === 'string' && typeof p.body === 'string').map(p => ({
       id:p.id || uid(), sectionId:ids.has(p.sectionId) ? p.sectionId : s.sections[0].id,
-      title:p.title, body:p.body, html:typeof p.html === 'string' ? p.html : undefined, created:p.created || now, updated:p.updated || now,
+      title:p.title, body:p.body, html:typeof p.html === 'string' ? p.html : undefined,
+      plan:(p.plan && typeof p.plan === 'object') ? { week:String(p.plan.week || ''), day:p.plan.day | 0 } : undefined,
+      planner:(p.planner && typeof p.planner === 'object' && typeof p.planner.date === 'string') ? p.planner : undefined, created:p.created || now, updated:p.updated || now,
       pdf:(p.pdf && typeof p.pdf === 'object') ? { name:String(p.pdf.name || 'PDF'), n:p.pdf.n | 0, of:p.pdf.of | 0 } : undefined }));
     s.sections.forEach(x => { if (!s.pages.some(p => p.sectionId === x.id)) s.pages.push(blank(x.id)); });
     if (!s.pages.some(p => p.id === s.currentId)) s.currentId = ordered(s)[0].id;
@@ -555,9 +585,10 @@ What I'll adjust:
   /* ---------- Kaizen Journal (replaces the Manifestation Journal) ---------- */
   // lines starting with # become bold headings
   function tpl(lines){
-    const body = lines.map(l => l.replace(/^#/, '')).join('\n');
+    const body = lines.map(l => l.replace(/^[#@]/, '')).join('\n');
     const html = lines.map(l => {
       if (/^#/.test(l)) return `<div><b>${esc(l.slice(1))}</b></div>`;
+      if (/^@/.test(l)) return `<div class="ph">${esc(l.slice(1))}</div>`;
       return `<div>${esc(l) || '<br>'}</div>`;
     }).join('');
     return { body, html };
@@ -781,6 +812,187 @@ What I'll adjust:
       save(true);
     }
     try { localStorage.setItem(FLAG, '1'); } catch (e) {}
+  })();
+
+  /* ---------- Daily Planner ---------- */
+  const isoDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const fromIso = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const longDay = d => d.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+  const MOTIVATION = [
+    'Small steps taken every day add up to results that surprise you.',
+    'Discipline is choosing what you want most over what you want right now.',
+    'You don\'t have to feel ready. You only have to begin.',
+    'Do the hard thing first, and the rest of the day gets lighter.',
+    'Progress, not perfection, is what moves you forward.',
+    'Show up today. Consistency beats intensity every time.',
+    'The work you do quietly today becomes the strength others see tomorrow.',
+    'Finish what you start, even when no one is watching.',
+    'A clear plan turns a busy day into a productive one.',
+    'Every expert was once a beginner who refused to quit.',
+    'Your habits are building your future, one day at a time.',
+    'Focus on the next right step, not the whole staircase.',
+    'Hard days are proof you\'re still in the fight.',
+    'Make today count. It won\'t come around again.',
+    'What you do daily matters more than what you do occasionally.',
+    'Courage is acting with purpose while the doubt is still talking.',
+    'Good things are built slowly and steadily. Keep building.',
+    'Effort compounds. Keep putting it in.',
+    'Start where you are, use what you have, do what you can.',
+    'One focused hour beats a scattered day.',
+    'Your pace is fine. Just don\'t stop.',
+    'Be faithful in the small tasks, and the big ones will follow.',
+    'You are stronger than the excuse that showed up this morning.',
+    'Momentum is made, not found. Make some today.',
+    'Plan the day, or the day will plan you.',
+    'The best time to start was yesterday. The next best time is now.',
+    'Keep your word to yourself. That\'s where confidence comes from.',
+    'A goal without a next step is only a wish. Take the step.',
+    'Every finished task is a promise kept.',
+    'Patience and persistence will carry you farther than talent alone.',
+    'Do it well, do it today, and let tomorrow take care of itself.',
+    'Growth begins at the edge of what\'s comfortable.',
+    'You\'ve handled hard things before. You can handle today.',
+    'Clarity comes from action, not from thinking about action.',
+    'Use your time like it matters, because it does.',
+    'Steady work beats sudden bursts.',
+    'Choose one thing and give it your best.',
+    'Rest when you need to, but don\'t quit.',
+    'What gets written down gets done.',
+    'Strong finishes start with strong mornings.',
+    'Your future self is counting on what you do today.',
+    'Don\'t wait for motivation. Build the habit and let motivation catch up.',
+    'Serve well, work hard, and stay humble.',
+    'A little better than yesterday is a win.',
+    'Excellence is a habit, practiced daily.',
+    'Gratitude turns what you have into enough, and makes room for more.',
+    'The obstacle in front of you is part of the path.',
+    'Commit to the process, and the results will follow.',
+    'Be the person who gets it done.',
+    'Today\'s effort is tomorrow\'s advantage.',
+    'Simplify the day: do what matters most, and do it first.',
+    'Persistence is quiet, but it always speaks in the end.',
+    'Leave every task better than you found it.',
+    'Purpose gives power to ordinary work.',
+    'There is no wasted effort when you\'re learning.',
+    'Keep the main thing the main thing.',
+    'Every day is a fresh page. Write something worth reading.',
+    'Your determination today sets the tone for tomorrow.',
+    'Do what you said you would do. That\'s character.',
+    'Big results come from small, faithful choices.'
+  ];
+  function motivationFor(iso){
+    const n = Math.floor(fromIso(iso).getTime() / 86400000);
+    return MOTIVATION[((n % MOTIVATION.length) + MOTIVATION.length) % MOTIVATION.length];
+  }
+  const HOURS = ['7a', '8a', '9a', '10a', '11a', '12p', '1p', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p'];
+  const plannerData = date => ({
+    date,
+    tasks:Array.from({ length:7 }, () => ({ t:'', done:false })),
+    top:Array.from({ length:3 }, () => ({ t:'', done:false })),
+    grat:['', '', ''], win:[''], better:[''],
+    sched:HOURS.map(() => ''),
+    notes:''
+  });
+  function fillPlanner(d){
+    const base = plannerData(d.date);
+    Object.keys(base).forEach(k => {
+      if (k === 'date' || k === 'notes') { if (typeof d[k] !== 'string') d[k] = base[k]; return; }
+      if (!Array.isArray(d[k])) d[k] = base[k];
+      while (d[k].length < base[k].length) d[k].push(base[k][d[k].length]);
+    });
+    return d;
+  }
+  function plannerPage(sid, date){
+    const p = blank(sid);
+    p.title = longDay(fromIso(date));
+    p.planner = plannerData(date);
+    p.body = '';
+    return p;
+  }
+  function plannerHtml(p){
+    const d = fillPlanner(p.planner), dt = fromIso(d.date);
+    const logo = (document.querySelector('.crest-logo') || {}).src || '';
+    const chk = (f, i) => `<div class="pl-row${d[f][i].done ? ' done' : ''}"><button type="button" class="pl-cb${d[f][i].done ? ' on' : ''}" data-cb="${f}.${i}" aria-label="Mark done"></button><input class="pl-in" data-f="${f}.${i}" value="${esc(d[f][i].t)}" autocomplete="off" aria-label="${f === 'top' ? 'Top priority' : 'Task'} ${i + 1}"></div>`;
+    const line = (f, i, label) => `<div class="pl-row"><input class="pl-in" data-f="${f}.${i}" value="${esc(d[f][i])}" autocomplete="off" aria-label="${label}"></div>`;
+    return `
+      <div class="pl-head">${logo ? `<img src="${logo}" alt="The Financial Foundation Society">` : ''}
+        <div style="flex:1;min-width:0"><div class="pl-title">Daily Planner</div>
+          <div class="pl-dd"><div>DATE <b>${esc(dt.toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' }))}</b></div><div>DAY <b>${esc(dt.toLocaleDateString(undefined, { weekday:'long' }))}</b></div></div>
+        </div></div>
+      <div class="pl-mot"><small>TODAY'S MOTIVATION</small><p>${esc(motivationFor(d.date))}</p></div>
+      <div class="pl-cols">
+        <div>
+          <div class="pl-h">Today's tasks</div>
+          ${d.tasks.map((_, i) => chk('tasks', i)).join('')}
+          <div class="pl-h pl-sp">Gratitude &amp; reflection</div>
+          <div class="pl-lb">I'm grateful for</div>
+          ${d.grat.map((_, i) => line('grat', i, 'Grateful for')).join('')}
+          <div class="pl-lb">Today's win</div>${line('win', 0, "Today's win")}
+          <div class="pl-lb">Tomorrow, 1% better</div>${line('better', 0, 'Tomorrow, 1% better')}
+        </div>
+        <div>
+          <div class="pl-h">Top 3 for today</div>
+          ${d.top.map((_, i) => chk('top', i)).join('')}
+          <div class="pl-h pl-sp">Schedule</div>
+          ${HOURS.map((h, i) => `<div class="pl-row"><span class="pl-time">${h}</span><input class="pl-in" data-f="sched.${i}" value="${esc(d.sched[i])}" autocomplete="off" aria-label="${h}"></div>`).join('')}
+        </div>
+      </div>
+      <div class="pl-h pl-sp">Notes</div>
+      <div class="pl-notes" contenteditable="true" aria-label="Notes">${sanitize(d.notes)}</div>`;
+  }
+  function plannerText(p){
+    const d = p.planner, out = [];
+    const add = (label, arr) => { const v = arr.map(x => typeof x === 'object' ? x.t : x).filter(x => x && x.trim()); if (v.length) out.push(label + ': ' + v.join('; ')); };
+    add('Tasks', d.tasks); add('Top 3', d.top); add('Grateful for', d.grat); add('Win', d.win); add('Better tomorrow', d.better);
+    const s = HOURS.map((h, i) => d.sched[i] ? `${h} ${d.sched[i]}` : '').filter(Boolean); if (s.length) out.push('Schedule: ' + s.join('; '));
+    const t = document.createElement('div'); t.innerHTML = d.notes || ''; const n = t.textContent.trim(); if (n) out.push('Notes: ' + n);
+    return out.join('\n');
+  }
+  function todayPlanPage(sid){
+    const t = isoDate(new Date());
+    return pagesIn(sid).find(p => p.planner && p.planner.date === t);
+  }
+  const PLANNER_GUIDE = [
+    'Each day gets one planner page with a fresh motivational statement at the top.',
+    '',
+    '#Using the page',
+    'Tap any line to type, or use Pen mode to write with your Apple Pencil.',
+    'Tap a box to check off a task or one of your Top 3.',
+    'The Notes area at the bottom grows as you write, so you never run out of room.',
+    '',
+    '#Adding pages',
+    'Tap New page while you\'re in this section. The first time each day it makes today\'s page. Tap it again to add tomorrow\'s page, so you can plan ahead.',
+    '',
+    '#Finding today',
+    'Tap the Daily Planner tab and it opens straight to today\'s page.'
+  ];
+  let addedPlanner = '';
+  (function setupDailyPlanner(){
+    const FLAG = 'leatherNotebook.dailyPlanner';
+    try { if (localStorage.getItem(FLAG)) return; } catch (e) {}
+    let s = state.sections.find(x => x.kind === 'planner');
+    if (s) {
+      if (s.name === 'Weekly Planner') s.name = 'Daily Planner';
+      // remove weekly pages that were never written on; anything you wrote stays
+      state.pages = state.pages.filter(p => !(p.sectionId === s.id && (p.plan || p.title === 'How the Weekly Planner works') && p.created === p.updated && !p.planner));
+      addedPlanner = 'replaced';
+    } else {
+      const used = state.sections.map(x => x.color);
+      s = { id:uid(), name:'Daily Planner', color:used.includes('#2C3E5C') ? (PALETTE.find(c => !used.includes(c)) || '#4A5A63') : '#2C3E5C', kind:'planner' };
+      state.sections.push(s);
+      addedPlanner = 'added';
+    }
+    if (!pagesIn(s.id).some(p => p.title === 'How the Daily Planner works')) {
+      const g = tpl(PLANNER_GUIDE), guide = blank(s.id);
+      guide.title = 'How the Daily Planner works'; guide.body = g.body; guide.html = g.html;
+      const first = pagesIn(s.id)[0];
+      if (first) state.pages.splice(state.pages.indexOf(first), 0, guide); else state.pages.push(guide);
+    }
+    if (!todayPlanPage(s.id)) state.pages.push(plannerPage(s.id, isoDate(new Date())));
+    if (!state.pages.some(p => p.id === state.currentId)) state.currentId = ordered()[0].id;
+    save(true);
+    try { localStorage.setItem(FLAG, '1'); localStorage.setItem('leatherNotebook.plannerAdded', '1'); } catch (e) {}
   })();
 
 
@@ -1230,7 +1442,7 @@ What I'll adjust:
         [...n.attributes].forEach(a => {
           const k = a.name.toLowerCase();
           if (k === 'color' && n.tagName === 'FONT' && /^#[0-9a-f]{3,8}$/i.test(a.value)) return;
-          if (k === 'class' && a.value === 'done') return;
+          if (k === 'class' && /^(done|ph)$/.test(a.value)) return;
           if (k === 'style') {
             const keep = a.value.split(';').map(x => x.trim()).filter(x => /^(color|font-weight|font-style|text-decoration(-line)?)\s*:\s*[#\w\s(),.%-]+$/i.test(x)).join(';');
             if (keep) { n.setAttribute('style', keep); return; }
@@ -1340,7 +1552,11 @@ What I'll adjust:
     showPdf(p);
     el.secLabel.textContent = sec.name;
     el.pageTitle.value = p.title;
-    el.body.innerHTML = p.pdf ? '' : pageHtml(p);
+    const isPl = !!p.planner;
+    el.sheet.classList.toggle('is-planner', isPl);
+    el.body.classList.toggle('planner', isPl);
+    el.body.contentEditable = isPl ? 'false' : 'true';
+    el.body.innerHTML = p.pdf ? '' : isPl ? plannerHtml(p) : pageHtml(p);
     ensureInkSpace();
     el.body.scrollTop = keepScroll ? scroll : 0;
     el.pageNum.innerHTML = `Page <b>${pos}</b> of ${inSec.length}`;
@@ -1409,8 +1625,9 @@ What I'll adjust:
     g.innerHTML = `<div class="sheet-inner"><div class="margin-line"></div><div class="sheet-head"><div class="head-main"><div class="sec-label">${esc(sec.name)}</div>
       <div class="g-title${p.title ? '' : ' empty'}">${esc(p.title || 'Untitled page')}</div></div>
       <div class="page-meta"><span>Page <b>${inSec.indexOf(p) + 1}</b> of ${inSec.length}</span><span>Updated ${fmt(p.updated)}</span></div></div>
-      <div class="body-wrap"><div class="page-body ghost-body">${p.pdf ? '' : pageHtml(p)}</div>${p.pdf ? `<div class="pdf-view"><img alt="" src="${PdfStore.cached(p.id) || ''}"></div>` : ''}<canvas class="ink"></canvas></div></div>`;
+      <div class="body-wrap"><div class="page-body ghost-body${p.planner ? ' planner' : ''}">${p.pdf ? '' : p.planner ? plannerHtml(p) : pageHtml(p)}</div>${p.pdf ? `<div class="pdf-view"><img alt="" src="${PdfStore.cached(p.id) || ''}"></div>` : ''}<canvas class="ink"></canvas></div></div>`;
     if (p.pdf) g.classList.add('is-pdf');
+    if (p.planner) g.classList.add('is-planner');
     el.stack.appendChild(g);
     const mir = g.querySelector('.ghost-body');
     if (p.id === state.currentId) mir.style.paddingBottom = el.body.style.paddingBottom;
@@ -1506,8 +1723,27 @@ What I'll adjust:
   function sweepDone(){
     [...el.body.children].forEach(b => { const bi = boxInfo(b); b.classList.toggle('done', !!(bi && bi.checked)); if (!b.className) b.removeAttribute('class'); });
   }
+  function savePlanner(){
+    const p = cur(), d = p.planner;
+    el.body.querySelectorAll('[data-f]').forEach(inp => {
+      const [f, i] = inp.dataset.f.split('.'); const k = +i;
+      if (!d[f]) return;
+      if (d[f][k] && typeof d[f][k] === 'object') d[f][k].t = inp.value; else d[f][k] = inp.value;
+    });
+    const n = el.body.querySelector('.pl-notes'); if (n) d.notes = n.textContent.trim() ? n.innerHTML : '';
+    p.body = plannerText(p);
+    touched(p);
+  }
+  el.body.addEventListener('click', e => {
+    const b = e.target.closest('.pl-cb'); if (!b || !cur().planner) return;
+    const [f, i] = b.dataset.cb.split('.'), item = cur().planner[f][+i];
+    item.done = !item.done;
+    b.classList.toggle('on', item.done); b.parentNode.classList.toggle('done', item.done);
+    savePlanner();
+  });
   function afterEdit(){
     if (cur().pdf) return;
+    if (cur().planner) { savePlanner(); return; }
     sweepDone();
     const p = cur(); p.body = bodyText();
     p.html = p.body.trim() || el.body.querySelector('font,b,strong,i,em,u') ? el.body.innerHTML : '';
@@ -1550,7 +1786,7 @@ What I'll adjust:
     return bi;
   }
   function boxTap(e, x, y){
-    if (penOn || cur().pdf) return;
+    if (penOn || cur().pdf || cur().planner) return;
     const bi = boxAtPoint(x, y); if (!bi) return;
     e.preventDefault();
     const v = bi.node.nodeValue;
@@ -1562,6 +1798,7 @@ What I'll adjust:
 
   function toggleChecklist(){
     if (cur().pdf) { toast('Checklists go on typed pages. Tap New page for a page you can type on.'); return; }
+    if (cur().planner) { toast('The planner page already has check boxes for tasks and your Top 3.'); return; }
     if (penOn) setPen(false);
     if (!restoreSel() || !el.body.textContent.trim()) {
       ensureBlocks();
@@ -1602,7 +1839,7 @@ What I'll adjust:
 
   // Return on a checklist line starts the next item; Return on an empty item ends the list
   el.body.addEventListener('keydown', e => {
-    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing || cur().planner) return;
     const sel = window.getSelection(); if (!sel.rangeCount || !sel.isCollapsed) return;
     ensureBlocks();
     const block = blockOf(sel.anchorNode), bi = boxInfo(block);
@@ -1674,6 +1911,15 @@ What I'll adjust:
 
   $('btnNew').addEventListener('click', () => openCover(() => {
     const c = cur(), sec = secById(c.sectionId);
+    if (sec.kind === 'planner') {
+      const today = isoDate(new Date()), ps = pagesIn(sec.id).filter(x => x.planner);
+      let date = today;
+      if (ps.some(x => x.planner.date === today)) date = isoDate(addDays(fromIso(ps.map(x => x.planner.date).sort().pop()), 1));
+      const np = plannerPage(sec.id, date), all = pagesIn(sec.id);
+      state.pages.splice(state.pages.indexOf(all[all.length - 1]) + 1, 0, np);
+      save(true); goTo(np.id);
+      toast(date === today ? "Today's planner page is ready." : `Added a page for ${np.title}.`); return;
+    }
     if (sec.kind === '369') {
       const existing = pagesIn(sec.id).find(x => x.title === todayTitle() && isE369(x));
       if (existing) { goTo(existing.id); toast("Today's 3-6-9 entry is already started."); return; }
@@ -1700,6 +1946,7 @@ What I'll adjust:
     if (inSec.length === 1) {
       if (!p.title && !p.body && !p.pdf && !Ink.has(p.id)) { toast('Each section keeps at least one page.'); return; }
       if (!confirm(`Clear “${name}”? It's the only page in this section, so its writing and handwriting will be erased. This can't be undone.`)) return;
+      if (p.planner) { p.planner = plannerData(p.planner.date); p.body = ''; p.updated = Date.now(); Ink.set(p.id, [], true); undo.delete(p.id); render(); save(true); toast('Page cleared'); return; }
       p.title = ''; p.body = ''; p.updated = Date.now(); Ink.set(p.id, [], true); undo.delete(p.id);
       if (p.pdf) { delete p.pdf; PdfStore.remove(p.id); }
       render(); save(true); toast('Page cleared'); return;
@@ -1718,7 +1965,11 @@ What I'll adjust:
     const b = e.target.closest('.tab'); if (!b) return;
     if (b.dataset.add) { openCover(() => addSection()); return; }
     const sid = b.dataset.sid;
-    openCover(() => { if (cur().sectionId !== sid) goTo(lastPageIn(sid).id); });
+    openCover(() => {
+      const sec = secById(sid), today = sec && sec.kind === 'planner' ? todayPlanPage(sid) : null;
+      if (today) { if (cur().id !== today.id) goTo(today.id); return; }
+      if (cur().sectionId !== sid) goTo(lastPageIn(sid).id);
+    });
   });
   function addSection(){
     const used = state.sections.map(s => s.color);
@@ -1981,6 +2232,7 @@ What I'll adjust:
     requestAnimationFrame(restore);
     Ink.ready.then(() => requestAnimationFrame(restore));
   }
+  if (addedPlanner) setTimeout(() => toast(addedPlanner === 'replaced' ? 'Your planner is now a Daily Planner.' : 'A Daily Planner section has been added.'), 1200);
   if (added369) setTimeout(() => toast('A 3-6-9 Journal section has been added.'), 3600);
   if (journalJustAdded) setTimeout(() => toast(journalJustAdded === 'replaced' ? 'Your journal section is now the Kaizen Journal.' : 'A Kaizen Journal section has been added.'), 600);
 })();

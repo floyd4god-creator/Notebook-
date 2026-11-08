@@ -217,6 +217,7 @@ body.pen .pen-badge{display:inline-flex}
 .cover-name{display:block;margin-top:26px;width:min(500px,76%)}
 .name-svg{display:block;width:100%;height:auto;shape-rendering:geometricPrecision}
 .cover-rule{display:block;width:120px;height:1px;margin-top:18px;background:linear-gradient(90deg,transparent,rgba(214,178,106,.8),transparent)}
+.cover-ftm{position:absolute;left:0;right:0;margin-left:26px;text-align:center;top:70%;font:600 26px/1 var(--display);letter-spacing:.32em;padding-left:.32em;color:#E9CD86;text-shadow:0 1.5px 0 rgba(18,8,2,.75),0 -1px 0 rgba(255,246,218,.25)}
 .cover-title{margin-top:12px;font:italic 500 20px/1.2 var(--display);color:#D8BC82;letter-spacing:.03em;text-shadow:0 1px 0 rgba(0,0,0,.6);max-width:80%;text-align:center}
 .cover-hint{position:absolute;bottom:40px;left:0;right:0;margin-left:26px;text-align:center;font-size:13px;color:rgba(230,205,160,.55)}
 .cover.opening{animation:coverOpen .85s cubic-bezier(.5,.05,.2,1) forwards}
@@ -379,6 +380,7 @@ body.closed .pager{opacity:0;pointer-events:none}
         <span class="cover-rule" aria-hidden="true"></span>
         <span class="cover-title" id="coverTitle"></span>
       </span>
+      <span class="cover-ftm" id="coverFtm" aria-label="F T M">FTM</span>
       <span class="cover-hint">Tap to open</span>
     </button>
   </div>
@@ -1578,7 +1580,7 @@ What I'll adjust:
     const rr = r.getBoundingClientRect(), br = el.body.getBoundingClientRect(), s = br.width / W0 || 1;
     el.body.scrollTop = Math.max(0, el.body.scrollTop + (rr.top - br.top) / s - 96);
   }
-  function setTitle(){ document.title = state.title; el.coverTitle.textContent = state.title; }
+  function setTitle(){ document.title = state.title; el.coverTitle.textContent = state.title; if (typeof placeFtm === 'function') requestAnimationFrame(placeFtm); }
 
   /* ---------- Cover ---------- */
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1604,6 +1606,7 @@ What I'll adjust:
     save(true);
     coverOpen = false; view.closed = true; saveView(true);
     el.cover.hidden = false;
+    placeFtm();
     document.body.classList.add('closed');
     if (reduced()) return;
     coverBusy = true;
@@ -2220,12 +2223,23 @@ What I'll adjust:
     book.style.setProperty('--s', pageScale);
     redrawInk();
   }
+  // keep FTM exactly halfway between "Notebook" and "Tap to open"
+  function placeFtm(){
+    if (el.cover.hidden) return;
+    const f = $('coverFtm'), c = el.cover.getBoundingClientRect();
+    const t = el.coverTitle.getBoundingClientRect(), h = document.querySelector('.cover-hint').getBoundingClientRect();
+    if (!c.height) return;
+    f.style.top = (((t.bottom + h.top) / 2) - c.top - f.offsetHeight / 2) + 'px';
+  }
+  window.addEventListener('resize', () => requestAnimationFrame(placeFtm));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeFtm);
   window.addEventListener('resize', fit);
   window.addEventListener('orientationchange', () => setTimeout(fit, 250));
   fit();
 
   if (!view.closed) { el.cover.hidden = true; coverOpen = true; document.body.classList.remove('closed'); }
   const resumeScroll = view.scroll && view.scroll.id === state.currentId ? view.scroll.top : 0;
+  requestAnimationFrame(placeFtm);
   render();
   if (resumeScroll) {
     const restore = () => { ensureInkSpace(); el.body.scrollTop = resumeScroll; redrawInk(); };

@@ -127,6 +127,7 @@ svg{flex:none}
 .page-body.planner .pl-lb{font:600 12px/1 var(--sans);color:var(--pl);margin-top:10px}
 .page-body.planner .pl-notes{min-height:96px;font:400 16px/24px var(--serif);color:var(--text);background-image:linear-gradient(to bottom,transparent 23px,var(--pl-line) 23px);background-size:100% 24px;outline:none;padding:0 2px;white-space:pre-wrap;margin-top:4px}
 .pl-notes:empty::before{content:"Write as much as you need. The notes grow as you write.";color:var(--muted);opacity:.7}
+.page-body .ex{color:var(--muted);font-style:italic}
 .page-body .done{text-decoration:line-through;text-decoration-color:var(--muted);text-decoration-thickness:1.5px;color:var(--muted)}
 .ghost-body{overflow:hidden}
 ::highlight(search){background-color:var(--mark)}
@@ -405,6 +406,13 @@ body.closed .pager{opacity:0;pointer-events:none}
   </div>
 </footer>
 <input type="file" id="pdfInput" accept="application/pdf,.pdf" hidden>
+<div class="progress" id="chooser" hidden role="dialog" aria-labelledby="chooserTitle">
+  <div class="progress-card"><h3 id="chooserTitle">Add a page</h3><p>What would you like to add to this section?</p>
+    <button class="btn-block primary" data-ch="daily">Today's entry</button>
+    <button class="btn-block" data-ch="weekly">Weekly review</button>
+    <button class="btn-block" data-ch="intent">New intention (another goal)</button>
+    <button class="btn-block" data-ch="cancel">Cancel</button></div>
+</div>
 <div class="progress" id="progress" hidden role="alertdialog" aria-live="polite">
   <div class="progress-card"><h3 id="progTitle">Adding PDF</h3><p id="progText">Opening the file…</p><div class="bar-track"><div class="bar-fill" id="progFill"></div></div></div>
 </div>
@@ -467,7 +475,7 @@ body.closed .pager{opacity:0;pointer-events:none}
     if (!Array.isArray(s.sections) && Array.isArray(s.pages)) s = migrate(s);
     if (!Array.isArray(s.sections) || !Array.isArray(s.pages)) return null;
     s.sections = s.sections.filter(x => x && typeof x.name === 'string')
-      .map((x, i) => ({ id:x.id || uid(), name:x.name || 'Untitled section', color:x.color || PALETTE[i % PALETTE.length], kind:['journal', '369', 'planner'].includes(x.kind) ? x.kind : undefined }));
+      .map((x, i) => ({ id:x.id || uid(), name:x.name || 'Untitled section', color:x.color || PALETTE[i % PALETTE.length], kind:['journal', '369', 'planner', 'intent'].includes(x.kind) ? x.kind : undefined }));
     if (!s.sections.length) return null;
     const ids = new Set(s.sections.map(x => x.id)), now = Date.now();
     s.pages = s.pages.filter(p => p && typeof p.title === 'string' && typeof p.body === 'string').map(p => ({
@@ -591,6 +599,7 @@ What I'll adjust:
     const html = lines.map(l => {
       if (/^#/.test(l)) return `<div><b>${esc(l.slice(1))}</b></div>`;
       if (/^@/.test(l)) return `<div class="ph">${esc(l.slice(1))}</div>`;
+      if (/^\(.*\)$/.test(l)) return `<div class="ex">${esc(l)}</div>`;
       return `<div>${esc(l) || '<br>'}</div>`;
     }).join('');
     return { body, html };
@@ -995,6 +1004,145 @@ What I'll adjust:
     if (!state.pages.some(p => p.id === state.currentId)) state.currentId = ordered()[0].id;
     save(true);
     try { localStorage.setItem(FLAG, '1'); localStorage.setItem('leatherNotebook.plannerAdded', '1'); } catch (e) {}
+  })();
+
+  /* ---------- Manifestation (vision, decision, daily action, weekly review) ---------- */
+  const INTENT_GUIDE = [
+    'Decide what you want, give it a clear direction, and take consistent action toward it. This section connects vision, belief, decisions, action and continued learning.',
+    '',
+    '#The seed picture',
+    'Your goal is the seed. Your daily work is its care. Your weekly review shows what needs attention. A clear desire gives you something to pursue; a scheduled action gives you something to do.',
+    '',
+    '#The routine',
+    '1. Define what you intend to accomplish. Replace a broad desire like "I want to be successful" with a specific result, and describe what finished means.',
+    '2. Picture the work it requires, not only the finished result: revising, accepting useful criticism, correcting errors, finishing the details. Ask, "What would the disciplined version of me do today?"',
+    '3. Turn belief into a decision. You don\'t have to feel confident every morning. Commit: "At the time I have set aside, I will work on this project." Belief here means a willingness to do the work and keep learning.',
+    '4. Give yourself a manageable daily assignment. Not "work on my book," but "revise two pages at 9:00 a.m." On a hard day, make it smaller and finish a useful part.',
+    '5. Review your progress every week. What did I finish? What prevented progress? What needs to change? What will I complete next week? If little is changing, adjust the schedule, the assignment or the method.',
+    '6. Keep the outcome tied to responsibility: prayerful planning, faithful stewardship, diligent work and submission to God\'s will. Commit to faithful action, knowing the final outcome isn\'t entirely in your control.',
+    '',
+    '#How to use this section',
+    'My Intention: fill this in first. Make a new one for each goal you\'re working on.',
+    'Today\'s entry: each morning, tap New page and choose Today\'s entry. It fills in your result and daily assignment from your intention. Tonight, record what you completed and your next step.',
+    'Weekly review: once a week, tap New page and choose Weekly review.'
+  ];
+  const INTENT_TEMPLATE = [
+    '#The result I am working toward',
+    '(specific; for example: I will prepare one completed book for publication)',
+    '',
+    '#What "finished" means',
+    '\u2610 ',
+    '\u2610 ',
+    '\u2610 ',
+    '',
+    '#Picturing the work it requires',
+    '(the revising, the criticism I\'ll accept, the errors I\'ll correct, the details I\'ll finish)',
+    '',
+    '',
+    '#My decision',
+    'At ______ (the time I have set aside), I will work on this project.',
+    '',
+    '#My daily assignment',
+    '(small and exact; for example: revise two pages at 9:00 a.m.)',
+    '',
+    '#My smaller assignment for difficult days',
+    '',
+    '',
+    '#Prayerful planning and stewardship',
+    'My prayer for this work:',
+    '',
+    'I commit to faithful action and leave the outcome in God\'s hands.',
+    '',
+    '#Start date',
+    '',
+    '#My weekly review day',
+    ''
+  ];
+  const isIntentPage = p => /^The result I am working toward/.test(p.body || '');
+  const isIntentDaily = p => /^Today's paragraph/.test(p.body || '');
+  const INTENT_HEADS = INTENT_TEMPLATE.filter(l => /^#/.test(l)).map(l => l.slice(1));
+  function answerAfter(body, heading){
+    const lines = (body || '').split('\n'), i = lines.indexOf(heading);
+    if (i < 0) return '';
+    for (let j = i + 1; j < lines.length && !INTENT_HEADS.includes(lines[j]); j++) {
+      const t = lines[j].trim();
+      if (!t || /^\(/.test(t)) continue;          // skip blanks and the example in brackets
+      return t.replace(/^[\u2610\u2611]\s*/, '');
+    }
+    return '';
+  }
+  function latestIntent(sid){ return pagesIn(sid).filter(isIntentPage).pop(); }
+  function intentDaily(sid){
+    const it = latestIntent(sid);
+    const result = it ? answerAfter(it.body, 'The result I am working toward') : '';
+    const assign = it ? answerAfter(it.body, 'My daily assignment') : '';
+    const t = tpl([
+      "#Today's paragraph",
+      result ? `The result I am working toward: ${result.replace(/\.$/, '')}.` : 'The result I am working toward is ______.',
+      assign ? `Today, I will move toward it by completing this: ${assign.replace(/\.$/, '')}${/\d\s*(:\d\d)?\s*(a\.?m|p\.?m)/i.test(assign) ? '' : ' at ______'}.` : 'Today, I will move toward it by completing ______ at ______.',
+      'The obstacle I expect is ______, and my response will be ______.',
+      'Tonight, I will record what I completed and identify my next step.',
+      '',
+      "#Today's assignment",
+      `\u2610 ${assign}`,
+      '',
+      '#What would the disciplined version of me do today?',
+      '',
+      '',
+      '#Tonight: what I completed',
+      '',
+      '',
+      '#My next step',
+      ''
+    ]);
+    const p = blank(sid); p.title = todayTitle(); p.body = t.body; p.html = t.html; return p;
+  }
+  function intentWeekly(sid){
+    const now = new Date(), mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7)), sun = addDays(mon, 6);
+    const sh = d => d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+    const t = tpl([
+      `#Week of ${sh(mon)} \u2013 ${sh(sun)}`,
+      '',
+      '#What did I finish?',
+      '',
+      '',
+      '#What prevented progress?',
+      '',
+      '',
+      '#What needs to change? (the schedule, the assignment or the method)',
+      '',
+      '',
+      '#What will I complete next week?',
+      '\u2610 ',
+      '\u2610 ',
+      '',
+      '#The seed check: what needs attention now?',
+      '',
+      ''
+    ]);
+    const p = blank(sid); p.title = `Weekly review, ${sh(mon)} \u2013 ${sh(sun)}`; p.body = t.body; p.html = t.html; return p;
+  }
+  function intentNewGoal(sid){
+    const t = tpl(INTENT_TEMPLATE), p = blank(sid);
+    p.title = pagesIn(sid).some(isIntentPage) ? 'My Intention (new goal)' : 'My Intention'; p.body = t.body; p.html = t.html; return p;
+  }
+  let addedIntent = false;
+  (function setupIntent(){
+    const FLAG = 'leatherNotebook.intentAdded';
+    try { if (localStorage.getItem(FLAG)) return; } catch (e) {}
+    if (!state.sections.some(s => s.kind === 'intent')) {
+      const used = state.sections.map(s => s.color);
+      const color = PALETTE.find(c => !used.includes(c)) || '#5B3A5E';
+      const s = { id:uid(), name:'Manifestation', color, kind:'intent' };
+      state.sections.push(s);
+      const g = tpl(INTENT_GUIDE), guide = blank(s.id);
+      guide.title = 'How this section works'; guide.body = g.body; guide.html = g.html;
+      state.pages.push(guide, intentNewGoal(s.id));
+      state.pages.push(intentDaily(s.id));
+      addedIntent = true;
+      save(true);
+    }
+    try { localStorage.setItem(FLAG, '1'); } catch (e) {}
   })();
 
 
@@ -1444,7 +1592,7 @@ What I'll adjust:
         [...n.attributes].forEach(a => {
           const k = a.name.toLowerCase();
           if (k === 'color' && n.tagName === 'FONT' && /^#[0-9a-f]{3,8}$/i.test(a.value)) return;
-          if (k === 'class' && /^(done|ph)$/.test(a.value)) return;
+          if (k === 'class' && /^(done|ph|ex)$/.test(a.value)) return;
           if (k === 'style') {
             const keep = a.value.split(';').map(x => x.trim()).filter(x => /^(color|font-weight|font-style|text-decoration(-line)?)\s*:\s*[#\w\s(),.%-]+$/i.test(x)).join(';');
             if (keep) { n.setAttribute('style', keep); return; }
@@ -1554,6 +1702,7 @@ What I'll adjust:
     showPdf(p);
     el.secLabel.textContent = sec.name;
     el.pageTitle.value = p.title;
+    el.pageTitle.style.fontSize = p.title.length > 22 ? '28px' : '';
     const isPl = !!p.planner;
     el.sheet.classList.toggle('is-planner', isPl);
     el.body.classList.toggle('planner', isPl);
@@ -1914,6 +2063,7 @@ What I'll adjust:
 
   $('btnNew').addEventListener('click', () => openCover(() => {
     const c = cur(), sec = secById(c.sectionId);
+    if (sec.kind === 'intent') { openChooser(sec.id); return; }
     if (sec.kind === 'planner') {
       const today = isoDate(new Date()), ps = pagesIn(sec.id).filter(x => x.planner);
       let date = today;
@@ -1943,6 +2093,26 @@ What I'll adjust:
     save(true);
     goTo(p.id);
   }));
+
+  // the Manifestation section asks which kind of page to add
+  const chooser = $('chooser'); let chooserSid = null;
+  function openChooser(sid){ chooserSid = sid; chooser.hidden = false; }
+  chooser.addEventListener('click', e => {
+    const b = e.target.closest('[data-ch]');
+    if (!b && e.target !== chooser) return;
+    chooser.hidden = true;
+    const k = b ? b.dataset.ch : 'cancel', sid = chooserSid;
+    if (k === 'cancel' || !sid) return;
+    if (k === 'daily') {
+      const ex = pagesIn(sid).find(x => x.title === todayTitle() && isIntentDaily(x));
+      if (ex) { goTo(ex.id); toast("Today's entry is already started."); return; }
+    }
+    const np = k === 'daily' ? intentDaily(sid) : k === 'weekly' ? intentWeekly(sid) : intentNewGoal(sid);
+    const all = pagesIn(sid);
+    state.pages.splice(state.pages.indexOf(all[all.length - 1]) + 1, 0, np);
+    save(true); goTo(np.id);
+    toast(k === 'daily' ? "Today's entry is ready." : k === 'weekly' ? 'Your weekly review is ready.' : 'A new intention page is ready.');
+  });
 
   $('btnDelete').addEventListener('click', () => {
     const p = cur(), name = p.title || 'this page', inSec = pagesIn(p.sectionId);
@@ -2246,6 +2416,7 @@ What I'll adjust:
     requestAnimationFrame(restore);
     Ink.ready.then(() => requestAnimationFrame(restore));
   }
+  if (addedIntent) setTimeout(() => toast('A Manifestation section has been added.'), 900);
   if (addedPlanner) setTimeout(() => toast(addedPlanner === 'replaced' ? 'Your planner is now a Daily Planner.' : 'A Daily Planner section has been added.'), 1200);
   if (added369) setTimeout(() => toast('A 3-6-9 Journal section has been added.'), 3600);
   if (journalJustAdded) setTimeout(() => toast(journalJustAdded === 'replaced' ? 'Your journal section is now the Kaizen Journal.' : 'A Kaizen Journal section has been added.'), 600);

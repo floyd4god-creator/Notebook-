@@ -128,6 +128,7 @@ svg{flex:none}
 .page-body.planner .pl-notes{min-height:96px;font:400 16px/24px var(--serif);color:var(--text);background-image:linear-gradient(to bottom,transparent 23px,var(--pl-line) 23px);background-size:100% 24px;outline:none;padding:0 2px;white-space:pre-wrap;margin-top:4px}
 .pl-notes:empty::before{content:"Write as much as you need. The notes grow as you write.";color:var(--muted);opacity:.7}
 .nb-title{min-width:110px}
+.btn-primary{white-space:nowrap}
 @media (max-width:1000px){#btnLock .lbl{display:none}}
 .lockv{position:absolute;inset:0;z-index:6;display:none;align-items:center;justify-content:center;padding:24px;background:var(--paper)}
 .sheet.locked .lockv{display:flex}
@@ -508,6 +509,7 @@ body.closed .pager{opacity:0;pointer-events:none}
       title:p.title, body:p.body, html:typeof p.html === 'string' ? p.html : undefined,
       plan:(p.plan && typeof p.plan === 'object') ? { week:String(p.plan.week || ''), day:p.plan.day | 0 } : undefined,
       planner:(p.planner && typeof p.planner === 'object' && typeof p.planner.date === 'string') ? p.planner : undefined,
+      person:typeof p.person === 'string' ? p.person : undefined,
       enc:(p.enc && typeof p.enc.iv === 'string') ? p.enc : undefined, created:p.created || now, updated:p.updated || now,
       pdf:(p.pdf && typeof p.pdf === 'object') ? { name:String(p.pdf.name || 'PDF'), n:p.pdf.n | 0, of:p.pdf.of | 0 } : undefined }));
     s.sections.forEach(x => { if (!s.pages.some(p => p.sectionId === x.id)) s.pages.push(blank(x.id)); });
@@ -1179,7 +1181,7 @@ What I'll adjust:
   function serial(){
     return Object.assign({}, state, { pages:state.pages.map(p => {
       const s = secById(p.sectionId);
-      if (s && s.kind === 'counsel' && s.lock) return { id:p.id, sectionId:p.sectionId, created:p.created, updated:p.updated, title:'', body:'', enc:p.enc };
+      if (s && s.kind === 'counsel' && s.lock) return { id:p.id, sectionId:p.sectionId, created:p.created, updated:p.updated, title:'', body:'', enc:p.enc, person:p.person };
       return p;
     }) });
   }
@@ -1367,7 +1369,14 @@ What I'll adjust:
     if (penOn) setPen(false);
     if (!s.lock) showLock(s, 'setup');
     else if (!unlocked.has(s.id)) showLock(s, lockState.sid === s.id && lockState.mode !== 'setup' ? lockState.mode : 'unlock');
-    else { el.sheet.classList.remove('locked'); lockState = {}; }
+    else {
+      el.sheet.classList.remove('locked'); lockState = {};
+      if (p.person) {
+        const file = pagesIn(s.id).filter(x => x.person === p.person), pr = file.find(x => x.id === p.person);
+        el.pageNum.innerHTML = `${esc((pr && pr.title) || 'Person')}'s file, <b>${file.indexOf(p) + 1}</b> of ${file.length}`;
+        el.pagerLabel.textContent = `${(pr && pr.title) || 'Person'}'s file, page ${file.indexOf(p) + 1} of ${file.length}`;
+      }
+    }
   }
   const lmsg = t => { const m = $('lmsg'); if (m) m.textContent = t; };
   async function lockAction(a){
@@ -1420,17 +1429,73 @@ What I'll adjust:
 
   // chooser for new pages
   const chooser2 = $('chooser2'); let chooser2Sid = null;
-  function openCounselChooser(sid){ chooser2Sid = sid; chooser2.hidden = false; }
+  const personName = (sid, pid) => { const pr = pagesIn(sid).find(x => x.id === pid); return (pr && pr.title.trim()) || 'Unnamed person'; };
+  const peopleIn = sid => pagesIn(sid).filter(x => x.person && x.person === x.id);
+  function openCounselChooser(sid){
+    chooser2Sid = sid;
+    const c = cur(), pid = c && c.sectionId === sid && c.person ? c.person : '';
+    const others = peopleIn(sid).filter(x => x.id !== pid);
+    const card = chooser2.querySelector('.progress-card');
+    card.innerHTML = `<h3 id="chooser2Title">Add a page</h3>` +
+      (pid ? `<p>You're in ${esc(personName(sid, pid))}'s file.</p>
+        <button class="btn-block primary" data-ch="session" data-pid="${pid}">New session for ${esc(personName(sid, pid))}</button>
+        <button class="btn-block" data-ch="plan" data-pid="${pid}">Coaching plan for ${esc(personName(sid, pid))}</button>
+        <button class="btn-block" data-ch="note" data-pid="${pid}">Blank page in ${esc(personName(sid, pid))}'s file</button>` : `<p>What would you like to add?</p>`) +
+      `<button class="btn-block${pid ? '' : ' primary'}" data-ch="person">New person (start a new file)</button>` +
+      (others.length ? `<p style="margin:12px 0 6px">New session for someone else:</p>` + others.map(x => `<button class="btn-block" data-ch="session" data-pid="${x.id}">${esc(x.title || 'Unnamed person')}</button>`).join('') : '') +
+      `<button class="btn-block" data-ch="self">My own coaching check-in</button>
+       <button class="btn-block" data-ch="blank">Blank page</button>
+       <button class="btn-block" data-ch="cancel">Cancel</button>`;
+    chooser2.hidden = false;
+  }
+  const SESSION_HEADS = T_SESSION().filter(l => /^#/.test(l)).map(l => l.slice(1));
+  function lastCommitments(prev){
+    if (!prev) return [];
+    const lines = prev.body.split('\n'), i = lines.indexOf('Will: what they will do this week');
+    const out = [];
+    if (i < 0) return out;
+    for (let j = i + 1; j < lines.length && !SESSION_HEADS.includes(lines[j]); j++) {
+      const t = lines[j].replace(/^[☐☑]\s*/, '').trim(); if (t) out.push(t);
+    }
+    return out;
+  }
   chooser2.addEventListener('click', async e => {
     const b = e.target.closest('[data-ch]');
     if (!b && e.target !== chooser2) return;
     chooser2.hidden = true;
-    const k = b ? b.dataset.ch : 'cancel', sid = chooser2Sid, key = unlocked.get(sid);
+    const k = b ? b.dataset.ch : 'cancel', sid = chooser2Sid, key = unlocked.get(sid), pid = b ? b.dataset.pid : '';
     if (k === 'cancel' || !sid || !key) return;
-    const np = counselPage(sid, k);
+    let np, after = null;
+    const short = new Date().toLocaleDateString(undefined, { month:'short', day:'numeric' });
+    if (k === 'person') {
+      const name = (prompt("Person's name or initials:") || '').trim();
+      if (!name) return;
+      np = counselPage(sid, 'client'); np.title = name; np.person = np.id;
+      np.body = np.body.replace(/^Name:/m, 'Name: ' + name);
+      if (np.html) np.html = np.html.replace('<div>Name:</div>', `<div>Name: ${esc(name)}</div>`);
+    } else if (k === 'session' || k === 'plan' || k === 'note') {
+      const name = personName(sid, pid), file = pagesIn(sid).filter(x => x.person === pid);
+      after = file[file.length - 1];
+      if (k === 'note') { np = counselPage(sid, 'blank'); np.title = `${name}: notes, ${short}`; }
+      else if (k === 'plan') {
+        np = counselPage(sid, 'plan'); np.title = `${name}: coaching plan`;
+        np.body = np.body.replace(/^Client:/m, 'Client: ' + name); if (np.html) np.html = np.html.replace('<div>Client:</div>', `<div>Client: ${esc(name)}</div>`);
+      } else {
+        const sessions = file.filter(x => /^Session notes/.test(x.body || ''));
+        const n = sessions.length + 1, last = lastCommitments(sessions[sessions.length - 1]);
+        const lines = T_SESSION().map(l => l === 'Client:' ? `Client: ${name}` : l === 'Session #:' ? `Session #: ${n}` : l);
+        if (last.length) {
+          const at = lines.indexOf('#Where they are today');
+          lines.splice(at, 0, '#Last time they committed to', ...last.map(t => '\u2610 ' + t), '');
+        }
+        const t = tpl(lines);
+        np = blank(sid); np.title = `${name}: session ${n}, ${short}`; np.body = t.body; np.html = t.html;
+      }
+      np.person = pid;
+    } else np = counselPage(sid, k);
     np.enc = await encObj(key, plainOf(np));
     const all = pagesIn(sid);
-    state.pages.splice(state.pages.indexOf(all[all.length - 1]) + 1, 0, np);
+    state.pages.splice(state.pages.indexOf(after || all[all.length - 1]) + 1, 0, np);
     save(true); goTo(np.id);
   });
 
@@ -2517,6 +2582,14 @@ What I'll adjust:
     el.summary.textContent = `${plural(state.sections.length, 'section')}, ${plural(state.pages.length, 'page')}`;
     el.list.innerHTML = state.sections.map(s => {
       const ps = pagesIn(s.id);
+      const item = (p, i) => `<button class="item${p.id === state.currentId ? ' current' : ''}" data-pid="${p.id}"><div class="top">
+          <span class="pno">p. ${i + 1}</span><span class="t">${esc(p.title || 'Untitled page')}</span><span class="n">${fmt(p.updated)}</span></div></button>`;
+      if (s.kind === 'counsel' && unlocked.has(s.id)) {
+        const loose = ps.filter(p => !p.person), people = ps.filter(p => p.person && p.person === p.id);
+        return `<div class="grp"><div class="grp-head" style="--c:${s.color}"><i></i>${esc(s.name)}</div>` + loose.map(item).join('') +
+          people.map(pr => `<div class="pl-lb" style="padding:10px 12px 2px;color:var(--muted)">${esc(pr.title || 'Unnamed person')}'s file</div>` +
+            ps.filter(p => p.person === pr.id).map(item).join('')).join('') + '</div>';
+      }
       return `<div class="grp"><div class="grp-head" style="--c:${s.color}"><i></i>${esc(s.name)}</div>` +
         ps.map((p, i) => `<button class="item${p.id === state.currentId ? ' current' : ''}" data-pid="${p.id}"><div class="top">
           <span class="pno">p. ${i + 1}</span><span class="t">${esc(p.title || 'Untitled page')}</span><span class="n">${p.pdf ? PDF_MARK : ''}${Ink.has(p.id) ? PEN_MARK : ''}${fmt(p.updated)}</span></div></button>`).join('') +

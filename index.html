@@ -1441,6 +1441,7 @@ What I'll adjust:
     else if (!unlocked.has(s.id)) showLock(s, lockState.sid === s.id && lockState.mode !== 'setup' ? lockState.mode : 'unlock');
     else {
       el.sheet.classList.remove('locked'); lockState = {};
+      { const list = ordered(), i = list.indexOf(p); el.prev.disabled = !counselStep(list, i, -1); el.next.disabled = !counselStep(list, i, 1); }
       if (p.person) {
         const file = pagesIn(s.id).filter(x => x.person === p.person), pr = file.find(x => x.id === p.person);
         el.pageNum.innerHTML = `${esc((pr && pr.title) || 'Person')}'s file, <b>${file.indexOf(p) + 1}</b> of ${file.length}`;
@@ -1463,7 +1464,7 @@ What I'll adjust:
     if (a === 'unlock') {
       lmsg('Unlocking…');
       if (!(await unlockSection(s, v('lp1')))) { lmsg("That passcode isn't right."); return; }
-      lockState = {}; render(); return;
+      lockState = {}; { const d = pagesIn(s.id).find(x => x.dir); if (d) state.currentId = d.id; } render(); return;
     }
     if (a === 'change') {
       if (v('lp1').length < 4) { lmsg('Use at least 4 characters for the new passcode.'); return; }
@@ -2280,9 +2281,33 @@ What I'll adjust:
     g.addEventListener('animationend', finish, {once:true});
     setTimeout(finish, 950);
   }
+  // In the Counseling section, page turns never cross into or between people's files:
+  // a file is opened only from the Client Directory, and turning pages stays inside that file.
+  function counselStep(list, i, d){
+    const c = list[i], n = list[i + d];
+    const sec = p => p && secById(p.sectionId), isC = p => { const s = sec(p); return !!(s && s.kind === 'counsel'); };
+    if (isC(c)) {
+      const sid = c.sectionId, ps = pagesIn(sid);
+      const group = c.person ? ps.filter(x => x.person === c.person) : ps.filter(x => !x.person);
+      const g = group[group.indexOf(c) + d];
+      if (g) return g.id;
+      if (c.person) return null;                       // end of a person's file
+      const idx = list.findIndex(x => x.sectionId === sid), last = idx + ps.length - 1;
+      const out = d > 0 ? list[last + 1] : list[idx - 1];
+      return out ? out.id : null;
+    }
+    if (isC(n)) {                                     // entering Counseling from another section
+      const ps = pagesIn(n.sectionId), front = ps.find(x => x.dir) || ps.find(x => !x.person);
+      return front ? front.id : null;
+    }
+    return undefined;
+  }
   function step(d){
-    const list = ordered(), i = list.findIndex(p => p.id === state.currentId) + d;
-    if (list[i]) goTo(list[i].id);
+    const list = ordered(), i = list.findIndex(p => p.id === state.currentId);
+    const t = counselStep(list, i, d);
+    if (t === null) { if (isCounsel(cur()) && cur().person) toast('End of this file. Tap the Counseling tab to return to the Client Directory.'); return; }
+    if (t !== undefined) { goTo(t); return; }
+    if (list[i + d]) goTo(list[i + d].id);
   }
 
   /* ---------- Editing ---------- */
@@ -2696,11 +2721,11 @@ What I'll adjust:
       if (s.kind === 'counsel' && unlocked.has(s.id)) {
         const loose = ps.filter(p => !p.person), people = ps.filter(p => p.person && p.person === p.id);
         return `<div class="grp"><div class="grp-head" style="--c:${s.color}"><i></i>${esc(s.name)}</div>` + loose.map(item).join('') +
-          people.map(pr => `<div class="pl-lb" style="padding:10px 12px 2px;color:var(--muted)">${esc(pr.title || 'Unnamed person')}'s file</div>` +
-            ps.filter(p => p.person === pr.id).map(item).join('')).join('') + '</div>';
+          (people.length ? `<div class="pl-lb" style="padding:10px 12px 2px;color:var(--muted)">${people.length === 1 ? '1 person' : people.length + ' people'}: open their files from the Client Directory</div>` : '') + '</div>';
       }
+      const shown = s.kind === 'counsel' ? ps.filter(p => !p.person) : ps;
       return `<div class="grp"><div class="grp-head" style="--c:${s.color}"><i></i>${esc(s.name)}</div>` +
-        ps.map((p, i) => `<button class="item${p.id === state.currentId ? ' current' : ''}" data-pid="${p.id}"><div class="top">
+        shown.map((p, i) => `<button class="item${p.id === state.currentId ? ' current' : ''}" data-pid="${p.id}"><div class="top">
           <span class="pno">p. ${i + 1}</span><span class="t">${esc(p.title || 'Untitled page')}</span><span class="n">${p.pdf ? PDF_MARK : ''}${Ink.has(p.id) ? PEN_MARK : ''}${fmt(p.updated)}</span></div></button>`).join('') +
         '</div>';
     }).join('') + '<button class="btn-block" data-act="manage">Manage sections</button>';

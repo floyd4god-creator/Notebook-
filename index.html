@@ -133,6 +133,17 @@ svg{flex:none}
 @media (max-width:920px){#btnCheck .lbl,#btnClose .lbl{display:none}}
 .bar{min-width:0;max-width:100vw}
 .bar-actions{min-width:0;flex-shrink:0}
+.dir-wrap h2{margin:6px 0 2px;font:600 30px/1.15 var(--display);color:var(--text)}
+.dir-wrap .sub{font-size:13px;color:var(--muted);margin-bottom:14px}
+.dir-search{width:100%;height:42px;border:1px solid var(--rule);border-radius:8px;padding:0 12px;font:16px var(--sans);background:rgba(120,90,50,.06);color:var(--text);margin-bottom:10px;-webkit-appearance:none}
+.dir-item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--rule);background:transparent;padding:12px 6px;cursor:pointer}
+.dir-item:hover{background:rgba(120,90,50,.07)}
+.dir-av{width:38px;height:38px;border-radius:50%;background:var(--sec);color:#fff;display:flex;align-items:center;justify-content:center;font:600 15px/1 var(--sans);flex:none}
+.dir-name{display:block;font:600 19px/1.2 var(--serif);color:var(--text)}
+.dir-meta{display:block;font-size:12.5px;color:var(--muted);margin-top:3px}
+.dir-chev{margin-left:auto;color:var(--muted)}
+.dir-add{margin-top:16px}
+.dir-empty{color:var(--muted);font-size:15px;line-height:1.5;padding:14px 4px}
 .lockv{position:absolute;inset:0;z-index:6;display:none;align-items:center;justify-content:center;padding:24px;background:var(--paper)}
 .sheet.locked .lockv{display:flex}
 .lock-card{width:min(380px,100%);text-align:center}
@@ -515,7 +526,7 @@ body.closed .pager{opacity:0;pointer-events:none}
       title:p.title, body:p.body, html:typeof p.html === 'string' ? p.html : undefined,
       plan:(p.plan && typeof p.plan === 'object') ? { week:String(p.plan.week || ''), day:p.plan.day | 0 } : undefined,
       planner:(p.planner && typeof p.planner === 'object' && typeof p.planner.date === 'string') ? p.planner : undefined,
-      person:typeof p.person === 'string' ? p.person : undefined,
+      person:typeof p.person === 'string' ? p.person : undefined, dir:p.dir === true ? true : undefined,
       enc:(p.enc && typeof p.enc.iv === 'string') ? p.enc : undefined, created:p.created || now, updated:p.updated || now,
       pdf:(p.pdf && typeof p.pdf === 'object') ? { name:String(p.pdf.name || 'PDF'), n:p.pdf.n | 0, of:p.pdf.of | 0 } : undefined }));
     s.sections.forEach(x => { if (!s.pages.some(p => p.sectionId === x.id)) s.pages.push(blank(x.id)); });
@@ -1187,7 +1198,7 @@ What I'll adjust:
   function serial(){
     return Object.assign({}, state, { pages:state.pages.map(p => {
       const s = secById(p.sectionId);
-      if (s && s.kind === 'counsel' && s.lock) return { id:p.id, sectionId:p.sectionId, created:p.created, updated:p.updated, title:'', body:'', enc:p.enc, person:p.person };
+      if (s && s.kind === 'counsel' && s.lock) return { id:p.id, sectionId:p.sectionId, created:p.created, updated:p.updated, title:'', body:'', enc:p.enc, person:p.person, dir:p.dir };
       return p;
     }) });
   }
@@ -1233,7 +1244,7 @@ What I'll adjust:
       if (!p.enc) continue;
       try { const o = await decObj(key, p.enc); p.title = o.t || ''; p.body = o.b || ''; if (o.h) p.html = o.h; else delete p.html; } catch (e) {}
     }
-    unlocked.set(s.id, key); lastAct = Date.now();
+    unlocked.set(s.id, key); lastAct = Date.now(); ensureDirectory(s);
     return true;
   }
   async function setPasscode(s, pass){
@@ -1241,7 +1252,7 @@ What I'll adjust:
     const key = await deriveKey(pass, salt);
     for (const p of pagesIn(s.id)) p.enc = await encObj(key, plainOf(p));
     s.lock = { salt, check:await encObj(key, 'notebook-ok') };
-    unlocked.set(s.id, key); lastAct = Date.now();
+    unlocked.set(s.id, key); lastAct = Date.now(); ensureDirectory(s);
     save(true);
   }
 
@@ -1344,6 +1355,58 @@ What I'll adjust:
   })();
   maskLocked();
 
+
+  /* ---------- Client directory (front page of the Counseling section) ---------- */
+  function ensureDirectory(s){
+    if (pagesIn(s.id).some(x => x.dir)) return;
+    const d = blank(s.id); d.title = 'Client Directory'; d.body = ''; d.dir = true;
+    const first = pagesIn(s.id)[0];
+    if (first) state.pages.splice(state.pages.indexOf(first), 0, d); else state.pages.push(d);
+    queueEnc(d);
+  }
+  function directoryHtml(sid){
+    const people = pagesIn(sid).filter(x => x.person && x.person === x.id)
+      .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity:'base' }));
+    const initials = n => (n || '?').replace(/^(dr|mr|mrs|ms|rev)\.?\s+/i, '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+    const rows = people.map(pr => {
+      const file = pagesIn(sid).filter(x => x.person === pr.id);
+      const sessions = file.filter(x => /^Session notes/.test(x.body || '')).length;
+      const last = Math.max(...file.map(x => x.updated || 0));
+      return `<button class="dir-item" data-open="${pr.id}" data-name="${esc((pr.title || '').toLowerCase())}">
+        <span class="dir-av">${esc(initials(pr.title))}</span>
+        <span><span class="dir-name">${esc(pr.title || 'Unnamed person')}</span>
+        <span class="dir-meta">${plural(sessions, 'session')} · ${plural(file.length, 'page')} · last updated ${fmt(last)}</span></span>
+        <svg class="dir-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button>`;
+    }).join('');
+    return `<div class="dir-wrap"><h2>Client Directory</h2><div class="sub">${people.length === 1 ? '1 person' : people.length + ' people'} · tap a name to open their file</div>
+      ${people.length > 5 ? '<input class="dir-search" placeholder="Find a name" autocomplete="off" aria-label="Find a name">' : ''}
+      ${rows || '<div class="dir-empty">No files yet. Tap Add a person to start someone\'s file.</div>'}
+      <button class="btn-block primary dir-add" data-addperson="1">+ Add a person</button></div>`;
+  }
+  async function addPerson(sid){
+    const key = unlocked.get(sid); if (!key) return;
+    const name = (prompt("Person's name or initials:") || '').trim();
+    if (!name) return;
+    const np = counselPage(sid, 'client'); np.title = name; np.person = np.id;
+    np.body = np.body.replace(/^Name:/m, 'Name: ' + name);
+    if (np.html) np.html = np.html.replace('<div>Name:</div>', `<div>Name: ${esc(name)}</div>`);
+    np.enc = await encObj(key, plainOf(np));
+    const all = pagesIn(sid);
+    state.pages.splice(state.pages.indexOf(all[all.length - 1]) + 1, 0, np);
+    save(true); goTo(np.id);
+  }
+  el.body.addEventListener('click', e => {
+    if (!cur() || !cur().dir) return;
+    const o = e.target.closest('[data-open]');
+    if (o) { goTo(o.dataset.open); return; }
+    if (e.target.closest('[data-addperson]')) addPerson(cur().sectionId);
+  });
+  el.body.addEventListener('input', e => {
+    if (!cur() || !cur().dir || !e.target.classList.contains('dir-search')) return;
+    const q = e.target.value.trim().toLowerCase();
+    el.body.querySelectorAll('.dir-item').forEach(b => { b.hidden = q && !b.dataset.name.includes(q); });
+  });
+
   // lock screen on the page
   const lockv = $('lockv');
   let lockState = {};
@@ -1371,7 +1434,7 @@ What I'll adjust:
   function updateLockUI(p){
     const s = secById(p.sectionId), c = !!(s && s.kind === 'counsel');
     $('btnLock').hidden = !(c && unlocked.has(s.id));
-    $('btnMove').hidden = !(c && unlocked.has(s.id) && p.person !== p.id);
+    $('btnMove').hidden = !(c && unlocked.has(s.id) && p.person !== p.id && !p.dir);
     if (!c) { el.sheet.classList.remove('locked'); return; }
     if (penOn) setPen(false);
     if (!s.lock) showLock(s, 'setup');
@@ -1395,7 +1458,7 @@ What I'll adjust:
     if (a === 'set') {
       if (v('lp1').length < 4) { lmsg('Use at least 4 characters.'); return; }
       if (v('lp1') !== v('lp2')) { lmsg("The two passcodes don't match."); return; }
-      lmsg('Encrypting…'); await setPasscode(s, v('lp1')); lockState = {}; render(); toast('Passcode set. These notes are now encrypted.'); return;
+      lmsg('Encrypting…'); await setPasscode(s, v('lp1')); lockState = {}; { const d = pagesIn(s.id).find(x => x.dir); if (d) state.currentId = d.id; } render(); toast('Passcode set. These notes are now encrypted.'); return;
     }
     if (a === 'unlock') {
       lmsg('Unlocking…');
@@ -2103,11 +2166,11 @@ What I'll adjust:
     el.secLabel.textContent = sec.name;
     el.pageTitle.value = p.title;
     el.pageTitle.style.fontSize = p.title.length > 22 ? '28px' : '';
-    const isPl = !!p.planner;
+    const isPl = !!p.planner || (!!p.dir && unlocked.has(p.sectionId));
     el.sheet.classList.toggle('is-planner', isPl);
     el.body.classList.toggle('planner', isPl);
     el.body.contentEditable = isPl ? 'false' : 'true';
-    el.body.innerHTML = p.pdf ? '' : isPl ? plannerHtml(p) : pageHtml(p);
+    el.body.innerHTML = p.pdf ? '' : p.dir ? (unlocked.has(p.sectionId) ? directoryHtml(p.sectionId) : '') : isPl ? plannerHtml(p) : pageHtml(p);
     ensureInkSpace();
     el.body.scrollTop = keepScroll ? scroll : 0;
     el.pageNum.innerHTML = `Page <b>${pos}</b> of ${inSec.length}`;
@@ -2178,7 +2241,7 @@ What I'll adjust:
     g.innerHTML = `<div class="sheet-inner"><div class="margin-line"></div><div class="sheet-head"><div class="head-main"><div class="sec-label">${esc(sec.name)}</div>
       <div class="g-title${p.title ? '' : ' empty'}">${esc(p.title || 'Untitled page')}</div></div>
       <div class="page-meta"><span>Page <b>${inSec.indexOf(p) + 1}</b> of ${inSec.length}</span><span>Updated ${fmt(p.updated)}</span></div></div>
-      <div class="body-wrap"><div class="page-body ghost-body${p.planner ? ' planner' : ''}">${p.pdf ? '' : p.planner ? plannerHtml(p) : pageHtml(p)}</div>${p.pdf ? `<div class="pdf-view"><img alt="" src="${PdfStore.cached(p.id) || ''}"></div>` : ''}<canvas class="ink"></canvas></div></div>`;
+      <div class="body-wrap"><div class="page-body ghost-body${p.planner || p.dir ? ' planner' : ''}">${p.pdf ? '' : p.dir ? (unlocked.has(p.sectionId) ? directoryHtml(p.sectionId) : '') : p.planner ? plannerHtml(p) : pageHtml(p)}</div>${p.pdf ? `<div class="pdf-view"><img alt="" src="${PdfStore.cached(p.id) || ''}"></div>` : ''}<canvas class="ink"></canvas></div></div>`;
     if (p.pdf) g.classList.add('is-pdf');
     if (p.planner) g.classList.add('is-planner');
     el.stack.appendChild(g);
@@ -2295,7 +2358,7 @@ What I'll adjust:
     savePlanner();
   });
   function afterEdit(){
-    if (cur().pdf) return;
+    if (cur().pdf || cur().dir) return;
     if (cur().planner) { savePlanner(); return; }
     sweepDone();
     const p = cur(); p.body = bodyText();
@@ -2518,6 +2581,7 @@ What I'll adjust:
 
   $('btnDelete').addEventListener('click', () => {
     if (isLockedPage(cur())) { toast('Unlock the Counseling section first.'); return; }
+    if (cur().dir) { toast('The directory stays at the front of the section. It lists your people automatically.'); return; }
     const p = cur(), name = p.title || 'this page', inSec = pagesIn(p.sectionId);
     if (inSec.length === 1) {
       if (!p.title && !p.body && !p.pdf && !Ink.has(p.id)) { toast('Each section keeps at least one page.'); return; }
@@ -2542,7 +2606,7 @@ What I'll adjust:
     if (b.dataset.add) { openCover(() => addSection()); return; }
     const sid = b.dataset.sid;
     openCover(() => {
-      const sec = secById(sid), today = sec && sec.kind === 'planner' ? todayPlanPage(sid) : null;
+      const sec = secById(sid), today = sec && sec.kind === 'planner' ? todayPlanPage(sid) : sec && sec.kind === 'counsel' ? pagesIn(sid).find(x => x.dir) : null;
       if (today) { if (cur().id !== today.id) goTo(today.id); return; }
       if (cur().sectionId !== sid) goTo(lastPageIn(sid).id);
     });

@@ -127,6 +127,19 @@ svg{flex:none}
 .page-body.planner .pl-lb{font:600 12px/1 var(--sans);color:var(--pl);margin-top:10px}
 .page-body.planner .pl-notes{min-height:96px;font:400 16px/24px var(--serif);color:var(--text);background-image:linear-gradient(to bottom,transparent 23px,var(--pl-line) 23px);background-size:100% 24px;outline:none;padding:0 2px;white-space:pre-wrap;margin-top:4px}
 .pl-notes:empty::before{content:"Write as much as you need. The notes grow as you write.";color:var(--muted);opacity:.7}
+.nb-title{min-width:110px}
+@media (max-width:1000px){#btnLock .lbl{display:none}}
+.lockv{position:absolute;inset:0;z-index:6;display:none;align-items:center;justify-content:center;padding:24px;background:var(--paper)}
+.sheet.locked .lockv{display:flex}
+.lock-card{width:min(380px,100%);text-align:center}
+.lock-card svg{color:var(--sec)}
+.lock-card h3{margin:10px 0 6px;font:600 28px/1.2 var(--display);color:var(--text)}
+.lock-card p{margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--muted)}
+.lock-card input{display:block;width:100%;height:48px;margin:0 0 10px;border:1px solid var(--rule);border-radius:8px;padding:0 14px;font:18px var(--sans);text-align:center;background:rgba(120,90,50,.06);color:var(--text);-webkit-appearance:none}
+.lock-card input:focus{outline:2px solid var(--gold);border-color:transparent}
+.lock-card .msg{min-height:20px;font-size:14px;color:var(--danger);margin:0 0 8px}
+.lock-card .links{display:flex;justify-content:center;gap:18px;margin-top:6px}
+.lock-card .links button{border:0;background:none;color:var(--muted);font-size:14px;text-decoration:underline;padding:6px}
 .page-body .ex{color:var(--muted);font-style:italic}
 .page-body .done{text-decoration:line-through;text-decoration-color:var(--muted);text-decoration-thickness:1.5px;color:var(--muted)}
 .ghost-body{overflow:hidden}
@@ -311,6 +324,9 @@ body.closed .pager{opacity:0;pointer-events:none}
     <button id="btnCheck" class="icon-btn" aria-label="Checklist">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="6" height="6" rx="1.2"/><path d="m4.5 7 1.2 1.2L8 5.9"/><rect x="3" y="14" width="6" height="6" rx="1.2"/><path d="M13 7h8M13 17h8"/></svg><span class="lbl">Checklist</span>
     </button>
+    <button id="btnLock" class="icon-btn" aria-label="Lock counseling notes" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span class="lbl">Lock</span>
+    </button>
     <button id="btnPen" class="icon-btn" aria-label="Pen mode">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/><path d="m14.5 5.5 3 3"/></svg><span class="lbl">Pen</span>
     </button>
@@ -370,7 +386,7 @@ body.closed .pager{opacity:0;pointer-events:none}
           <canvas class="ink" id="ink"></canvas>
           <div class="hl-chip" id="hlChip"><span id="hlText"></span><button id="hlClear">Clear</button></div>
         </div>
-      </div></article>
+      </div><div class="lockv" id="lockv"></div></article>
     </div>
     <nav class="tabs" id="tabs" aria-label="Sections"></nav>
     <button class="cover leather" id="cover" aria-label="Open notebook">
@@ -406,6 +422,15 @@ body.closed .pager{opacity:0;pointer-events:none}
   </div>
 </footer>
 <input type="file" id="pdfInput" accept="application/pdf,.pdf" hidden>
+<div class="progress" id="chooser2" hidden role="dialog" aria-labelledby="chooser2Title">
+  <div class="progress-card"><h3 id="chooser2Title">Add a page</h3><p>What would you like to add?</p>
+    <button class="btn-block primary" data-ch="session">Session notes</button>
+    <button class="btn-block" data-ch="client">New client profile</button>
+    <button class="btn-block" data-ch="plan">Coaching plan</button>
+    <button class="btn-block" data-ch="self">My own coaching check-in</button>
+    <button class="btn-block" data-ch="blank">Blank page</button>
+    <button class="btn-block" data-ch="cancel">Cancel</button></div>
+</div>
 <div class="progress" id="chooser" hidden role="dialog" aria-labelledby="chooserTitle">
   <div class="progress-card"><h3 id="chooserTitle">Add a page</h3><p>What would you like to add to this section?</p>
     <button class="btn-block primary" data-ch="daily">Today's entry</button>
@@ -475,14 +500,15 @@ body.closed .pager{opacity:0;pointer-events:none}
     if (!Array.isArray(s.sections) && Array.isArray(s.pages)) s = migrate(s);
     if (!Array.isArray(s.sections) || !Array.isArray(s.pages)) return null;
     s.sections = s.sections.filter(x => x && typeof x.name === 'string')
-      .map((x, i) => ({ id:x.id || uid(), name:x.name || 'Untitled section', color:x.color || PALETTE[i % PALETTE.length], kind:['journal', '369', 'planner', 'intent'].includes(x.kind) ? x.kind : undefined }));
+      .map((x, i) => ({ id:x.id || uid(), name:x.name || 'Untitled section', color:x.color || PALETTE[i % PALETTE.length], kind:['journal', '369', 'planner', 'intent', 'counsel'].includes(x.kind) ? x.kind : undefined, lock:(x.lock && typeof x.lock.salt === 'string') ? x.lock : undefined }));
     if (!s.sections.length) return null;
     const ids = new Set(s.sections.map(x => x.id)), now = Date.now();
     s.pages = s.pages.filter(p => p && typeof p.title === 'string' && typeof p.body === 'string').map(p => ({
       id:p.id || uid(), sectionId:ids.has(p.sectionId) ? p.sectionId : s.sections[0].id,
       title:p.title, body:p.body, html:typeof p.html === 'string' ? p.html : undefined,
       plan:(p.plan && typeof p.plan === 'object') ? { week:String(p.plan.week || ''), day:p.plan.day | 0 } : undefined,
-      planner:(p.planner && typeof p.planner === 'object' && typeof p.planner.date === 'string') ? p.planner : undefined, created:p.created || now, updated:p.updated || now,
+      planner:(p.planner && typeof p.planner === 'object' && typeof p.planner.date === 'string') ? p.planner : undefined,
+      enc:(p.enc && typeof p.enc.iv === 'string') ? p.enc : undefined, created:p.created || now, updated:p.updated || now,
       pdf:(p.pdf && typeof p.pdf === 'object') ? { name:String(p.pdf.name || 'PDF'), n:p.pdf.n | 0, of:p.pdf.of | 0 } : undefined }));
     s.sections.forEach(x => { if (!s.pages.some(p => p.sectionId === x.id)) s.pages.push(blank(x.id)); });
     if (!s.pages.some(p => p.id === s.currentId)) s.currentId = ordered(s)[0].id;
@@ -504,7 +530,7 @@ body.closed .pager{opacity:0;pointer-events:none}
   function save(now){
     clearTimeout(saveTimer);
     const write = () => {
-      try { localStorage.setItem(KEY, JSON.stringify(state)); }
+      try { localStorage.setItem(KEY, JSON.stringify(serial())); }
       catch (e) { if (!warned) { warned = true; toast("Couldn't save on this device. Use Backup to download a copy."); } }
     };
     if (now) write(); else saveTimer = setTimeout(write, 350);
@@ -1145,6 +1171,269 @@ What I'll adjust:
     try { localStorage.setItem(FLAG, '1'); } catch (e) {}
   })();
 
+  /* ---------- Counseling & Life Coaching (encrypted, lockable) ---------- */
+  const unlocked = new Map();          // section id -> AES key, only while unlocked
+  const encPending = new Map();
+  const isCounsel = p => { const s = p && secById(p.sectionId); return !!(s && s.kind === 'counsel'); };
+  const isLockedPage = p => isCounsel(p) && !unlocked.has(p.sectionId);
+  function serial(){
+    return Object.assign({}, state, { pages:state.pages.map(p => {
+      const s = secById(p.sectionId);
+      if (s && s.kind === 'counsel' && s.lock) return { id:p.id, sectionId:p.sectionId, created:p.created, updated:p.updated, title:'', body:'', enc:p.enc };
+      return p;
+    }) });
+  }
+  const b64 = buf => { let s = ''; const a = new Uint8Array(buf); for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); };
+  const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  async function deriveKey(pass, salt){
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({ name:'PBKDF2', salt:unb64(salt), iterations:250000, hash:'SHA-256' }, base, { name:'AES-GCM', length:256 }, false, ['encrypt', 'decrypt']);
+  }
+  async function encObj(key, obj){
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const d = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify(obj)));
+    return { iv:b64(iv), d:b64(d) };
+  }
+  async function decObj(key, e){
+    const d = await crypto.subtle.decrypt({ name:'AES-GCM', iv:unb64(e.iv) }, key, unb64(e.d));
+    return JSON.parse(new TextDecoder().decode(d));
+  }
+  const plainOf = p => ({ t:p.title, b:p.body, h:p.html || '' });
+  function queueEnc(p){
+    const key = unlocked.get(p.sectionId); if (!key) return;
+    const job = encObj(key, plainOf(p)).then(e => { p.enc = e; if (encPending.get(p.id) === job) encPending.delete(p.id); save(); });
+    encPending.set(p.id, job);
+  }
+  function maskLocked(){
+    state.sections.filter(s => s.kind === 'counsel' && s.lock && !unlocked.has(s.id)).forEach(s => {
+      pagesIn(s.id).forEach(p => { p.title = 'Locked page'; p.body = ''; delete p.html; });
+    });
+  }
+  async function lockAll(){
+    if (!unlocked.size) return;
+    await Promise.all([...encPending.values()]).catch(() => {});
+    unlocked.clear(); maskLocked(); save(true);
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    document.body.classList.remove('editing');
+    lockState = {};
+    if (cur()) render(true);
+  }
+  async function unlockSection(s, pass){
+    const key = await deriveKey(pass, s.lock.salt);
+    try { if ((await decObj(key, s.lock.check)) !== 'notebook-ok') throw 0; } catch (e) { return false; }
+    for (const p of pagesIn(s.id)) {
+      if (!p.enc) continue;
+      try { const o = await decObj(key, p.enc); p.title = o.t || ''; p.body = o.b || ''; if (o.h) p.html = o.h; else delete p.html; } catch (e) {}
+    }
+    unlocked.set(s.id, key); lastAct = Date.now();
+    return true;
+  }
+  async function setPasscode(s, pass){
+    const salt = b64(crypto.getRandomValues(new Uint8Array(16)));
+    const key = await deriveKey(pass, salt);
+    for (const p of pagesIn(s.id)) p.enc = await encObj(key, plainOf(p));
+    s.lock = { salt, check:await encObj(key, 'notebook-ok') };
+    unlocked.set(s.id, key); lastAct = Date.now();
+    save(true);
+  }
+
+  const C_GUIDE = [
+    'This section keeps confidential counseling and life-coaching notes. Everything in it is encrypted with your passcode and locks automatically.',
+    '',
+    '#Locking',
+    'The section locks when you tap Lock, close the notebook, switch to another app, or leave it untouched for 10 minutes.',
+    'Your passcode cannot be recovered. If you forget it, the notes cannot be opened by anyone, including you. When the iPad offers to save the passcode to Passwords, saving it there is a good safeguard.',
+    'Backups keep these notes encrypted, so a backup file is safe to store, but you still need the passcode to read them.',
+    'To keep every note encrypted, Pen and Add PDF are turned off here. Type or use Scribble.',
+    '',
+    '#Adding pages',
+    'Tap New page while unlocked and choose: Session notes, New client profile, Coaching plan, My own coaching check-in, or a Blank page. Rename any page by tapping its title; for example, put the client\'s initials in the title.',
+    '',
+    '#The coaching conversation (GROW)',
+    'Goal: What do you want from today\'s conversation? What would success look like?',
+    'Reality: What is happening now? What have you already tried? What is in your control?',
+    'Options: What could you do? What else? What would you tell a friend in your place?',
+    'Will: What will you do, and by when? How will I know? What might get in the way?',
+    '',
+    '#Good questions to keep handy',
+    'What matters most to you about this?',
+    'What would the person you want to become do here?',
+    'What is one step you could take this week?',
+    'Where do you see God at work in this?',
+    'On a scale of 1 to 10, how committed are you? What would make it one point higher?',
+    '',
+    '#Care and referral',
+    'If someone talks about harming themselves or others, abuse, or a crisis beyond coaching, note it under Safety and follow up promptly, including a referral to a licensed professional or emergency help when needed.'
+  ];
+  const T_CLIENT = [
+    '#Client', 'Name:', 'Phone / email:', 'How we met or who referred them:', 'First session date:', '',
+    '#What brings them', '', '',
+    '#Their goals, in their own words', '', '',
+    '#Strengths and supports', '(family, church, friends, skills)', '',
+    '#Faith background', '', '',
+    '#Things to remember', '', '',
+    '#Safety notes', '(any concern that needs a referral or follow-up)', ''
+  ];
+  const T_SESSION = () => [
+    '#Session notes', 'Client:', `Date: ${todayTitle()}`, 'Session #:', '',
+    '#Where they are today', '(mood, events since last time, how last week\'s steps went)', '',
+    '#Goal: what do they want from today?', '', '',
+    '#Reality: what is happening now?', '', '',
+    '#Options: what could they do?', '1. ', '2. ', '3. ', '',
+    '#Will: what they will do this week', '☐ ', '☐ ', '',
+    '#Scripture, principle or encouragement shared', '', '',
+    '#My observations', '', '',
+    '#Prayer requests', '', '',
+    '#Follow-up', 'Next session:', 'Check in on:', '',
+    '#Safety notes', '(only if needed)', ''
+  ];
+  const T_PLAN = [
+    '#Coaching plan', 'Client:', `Start date: ${todayTitle()}`, '',
+    '#Vision: where they want to be in 90 days', '', '',
+    '#Goal 1', 'How we\'ll measure it:', 'By when:', '',
+    '#Goal 2', 'How we\'ll measure it:', 'By when:', '',
+    '#Goal 3', 'How we\'ll measure it:', 'By when:', '',
+    '#Obstacles to watch for', '', '',
+    '#Accountability', 'How and when we\'ll check in:', '',
+    '#Milestones', '☐ 30 days: ', '☐ 60 days: ', '☐ 90 days: ', '',
+    '#How we\'ll celebrate', ''
+  ];
+  const T_SELF = () => [
+    '#My coaching check-in', `Date: ${todayTitle()}`, '',
+    '#How full is each area? (1 to 10)', 'Faith:', 'Family and marriage:', 'Health:', 'Finances:', 'Work and ministry:', 'Friendships:', 'Rest and recreation:', 'Learning and growth:', '',
+    '#The one area to focus on now', '', '',
+    '#Goal: what do I want here?', '', '',
+    '#Reality: where am I honestly?', '', '',
+    '#Options: what could I do?', '1. ', '2. ', '3. ', '',
+    '#Will: my next step and when', '☐ ', '',
+    '#Who will hold me accountable?', ''
+  ];
+  function counselPage(sid, kind){
+    const p = blank(sid);
+    const map = { session:['Session notes, ' + new Date().toLocaleDateString(undefined, { month:'short', day:'numeric' }), T_SESSION()],
+      client:['Client profile', T_CLIENT], plan:['Coaching plan', T_PLAN],
+      self:['My check-in, ' + new Date().toLocaleDateString(undefined, { month:'short', day:'numeric' }), T_SELF()], blank:['', null] };
+    const [title, lines] = map[kind];
+    p.title = title;
+    if (lines) { const t = tpl(lines); p.body = t.body; p.html = t.html; }
+    return p;
+  }
+  let addedCounsel = false;
+  (function setupCounsel(){
+    const FLAG = 'leatherNotebook.counselAdded';
+    try { if (localStorage.getItem(FLAG)) return; } catch (e) {}
+    if (!state.sections.some(s => s.kind === 'counsel')) {
+      const used = state.sections.map(s => s.color);
+      const s = { id:uid(), name:'Counseling', color:PALETTE.find(c => !used.includes(c)) || '#4A5A63', kind:'counsel' };
+      state.sections.push(s);
+      const g = tpl(C_GUIDE), guide = blank(s.id);
+      guide.title = 'How this section works'; guide.body = g.body; guide.html = g.html;
+      state.pages.push(guide, counselPage(s.id, 'client'), counselPage(s.id, 'session'));
+      addedCounsel = true;
+      save(true);
+    }
+    try { localStorage.setItem(FLAG, '1'); } catch (e) {}
+  })();
+  maskLocked();
+
+  // lock screen on the page
+  const lockv = $('lockv');
+  let lockState = {};
+  const LOCK_ICON = '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+  function showLock(s, mode){
+    el.sheet.classList.add('locked');
+    if (lockState.sid === s.id && lockState.mode === mode) return;
+    lockState = { sid:s.id, mode };
+    const box = (id, ph, ac) => `<input type="password" id="${id}" placeholder="${ph}" autocomplete="${ac}" autocapitalize="off" spellcheck="false">`;
+    let h = '';
+    if (mode === 'setup') h = `<h3>Set a passcode</h3><p>Your ${esc(s.name)} notes will be encrypted with this passcode. Use at least 4 characters. It can't be recovered if you forget it.</p>
+      ${box('lp1', 'New passcode', 'new-password')}${box('lp2', 'Type it again', 'new-password')}<div class="msg" id="lmsg"></div>
+      <button class="btn-block primary" data-lk="set">Set passcode and open</button>`;
+    else if (mode === 'unlock') h = `<h3>${esc(s.name)} is locked</h3><p>Enter your passcode to open these notes.</p>
+      ${box('lp1', 'Passcode', 'current-password')}<div class="msg" id="lmsg"></div>
+      <button class="btn-block primary" data-lk="unlock">Unlock</button>
+      <div class="links"><button data-lk="tochange">Change passcode</button><button data-lk="toforgot">Forgot passcode?</button></div>`;
+    else if (mode === 'change') h = `<h3>Change passcode</h3><p>Enter your current passcode, then the new one.</p>
+      ${box('lp0', 'Current passcode', 'current-password')}${box('lp1', 'New passcode', 'new-password')}${box('lp2', 'Type the new one again', 'new-password')}<div class="msg" id="lmsg"></div>
+      <button class="btn-block primary" data-lk="change">Change passcode</button><div class="links"><button data-lk="tounlock">Back</button></div>`;
+    else h = `<h3>Forgot your passcode?</h3><p>Because the notes are encrypted, they can't be opened without it. You can erase every page in ${esc(s.name)} and start over with a new passcode. Your other sections aren't affected.</p>
+      <button class="btn-block" data-lk="erase" style="color:var(--danger)">Erase these notes and start over</button><div class="links"><button data-lk="tounlock">Back</button></div>`;
+    lockv.innerHTML = `<div class="lock-card">${LOCK_ICON}${h}</div>`;
+  }
+  function updateLockUI(p){
+    const s = secById(p.sectionId), c = !!(s && s.kind === 'counsel');
+    $('btnLock').hidden = !(c && unlocked.has(s.id));
+    if (!c) { el.sheet.classList.remove('locked'); return; }
+    if (penOn) setPen(false);
+    if (!s.lock) showLock(s, 'setup');
+    else if (!unlocked.has(s.id)) showLock(s, lockState.sid === s.id && lockState.mode !== 'setup' ? lockState.mode : 'unlock');
+    else { el.sheet.classList.remove('locked'); lockState = {}; }
+  }
+  const lmsg = t => { const m = $('lmsg'); if (m) m.textContent = t; };
+  async function lockAction(a){
+    const s = secById(cur().sectionId); if (!s) return;
+    const v = id => ($(id) || {}).value || '';
+    if (a === 'tochange') { lockState = {}; showLock(s, 'change'); return; }
+    if (a === 'toforgot') { lockState = {}; showLock(s, 'forgot'); return; }
+    if (a === 'tounlock') { lockState = {}; showLock(s, 'unlock'); return; }
+    if (a === 'set') {
+      if (v('lp1').length < 4) { lmsg('Use at least 4 characters.'); return; }
+      if (v('lp1') !== v('lp2')) { lmsg("The two passcodes don't match."); return; }
+      lmsg('Encrypting…'); await setPasscode(s, v('lp1')); lockState = {}; render(); toast('Passcode set. These notes are now encrypted.'); return;
+    }
+    if (a === 'unlock') {
+      lmsg('Unlocking…');
+      if (!(await unlockSection(s, v('lp1')))) { lmsg("That passcode isn't right."); return; }
+      lockState = {}; render(); return;
+    }
+    if (a === 'change') {
+      if (v('lp1').length < 4) { lmsg('Use at least 4 characters for the new passcode.'); return; }
+      if (v('lp1') !== v('lp2')) { lmsg("The new passcodes don't match."); return; }
+      lmsg('Changing…');
+      if (!(await unlockSection(s, v('lp0')))) { lmsg("The current passcode isn't right."); return; }
+      await setPasscode(s, v('lp1')); lockState = {}; render(); toast('Passcode changed.'); return;
+    }
+    if (a === 'erase') {
+      if (!confirm(`Erase every page in ${s.name}? This can't be undone.`)) return;
+      state.pages = state.pages.filter(p => p.sectionId !== s.id);
+      delete s.lock; unlocked.delete(s.id);
+      const g = tpl(C_GUIDE), guide = blank(s.id);
+      guide.title = 'How this section works'; guide.body = g.body; guide.html = g.html;
+      state.pages.push(guide); state.currentId = guide.id;
+      save(true); lockState = {}; render(); toast('Erased. Set a new passcode to start again.');
+    }
+  }
+  lockv.addEventListener('click', e => { const b = e.target.closest('[data-lk]'); if (b) lockAction(b.dataset.lk); });
+  lockv.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const b = lockv.querySelector('.btn-block.primary'); if (b) b.click();
+  });
+  $('btnLock').addEventListener('click', () => { lockAll(); toast('Counseling notes locked.'); });
+
+  // automatic locking
+  let lastAct = Date.now();
+  ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, () => { lastAct = Date.now(); }, true));
+  setInterval(() => { if (unlocked.size && Date.now() - lastAct > 10 * 60 * 1000) lockAll(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) lockAll(); });
+  window.addEventListener('pagehide', () => { lockAll(); });
+
+  // chooser for new pages
+  const chooser2 = $('chooser2'); let chooser2Sid = null;
+  function openCounselChooser(sid){ chooser2Sid = sid; chooser2.hidden = false; }
+  chooser2.addEventListener('click', async e => {
+    const b = e.target.closest('[data-ch]');
+    if (!b && e.target !== chooser2) return;
+    chooser2.hidden = true;
+    const k = b ? b.dataset.ch : 'cancel', sid = chooser2Sid, key = unlocked.get(sid);
+    if (k === 'cancel' || !sid || !key) return;
+    const np = counselPage(sid, k);
+    np.enc = await encObj(key, plainOf(np));
+    const all = pagesIn(sid);
+    state.pages.splice(state.pages.indexOf(all[all.length - 1]) + 1, 0, np);
+    save(true); goTo(np.id);
+  });
+
 
 
   /* ---------- Handwriting (Pen mode) ---------- */
@@ -1282,6 +1571,7 @@ What I'll adjust:
     el.undoBtn.disabled = !(undo.get(state.currentId) || []).length;
   }
   function setPen(on){
+    if (on && isCounsel(cur())) { toast('Pen is turned off in the Counseling section so every note stays encrypted. Type or use Scribble.'); return; }
     if (on && !coverOpen) { openCover(() => setPen(true)); return; }
     penOn = on;
     document.body.classList.toggle('pen', on);
@@ -1565,7 +1855,7 @@ What I'll adjust:
       if (doc) try { doc.destroy(); } catch (e) {}
     }
   }
-  $('btnPdf').addEventListener('click', () => openCover(() => $('pdfInput').click()));
+  $('btnPdf').addEventListener('click', () => openCover(() => { if (isCounsel(cur())) { toast('PDFs are turned off in the Counseling section so every note stays encrypted.'); return; } $('pdfInput').click(); }));
   $('pdfInput').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importPdf(f); });
   PdfStore.ready.then(() => { if (cur() && cur().pdf) { const img = document.getElementById('pdfImg'); img.dataset.id = ''; showPdf(cur()); } });
 
@@ -1718,6 +2008,7 @@ What I'll adjust:
     renderTabs();
     updateMirror();
     redrawInk(); updateTools();
+    updateLockUI(p);
     view.lastBySec[p.sectionId] = p.id;
     if (!keepScroll) view.scroll = { id:p.id, top:0 };
     saveView();
@@ -1827,7 +2118,7 @@ What I'll adjust:
   el.nbTitle.addEventListener('keydown', e => { if (e.key === 'Enter') el.nbTitle.blur(); });
   el.nbTitle.addEventListener('blur', () => { if (!el.nbTitle.value.trim()) el.nbTitle.value = state.title; });
 
-  function touched(p){ p.updated = Date.now(); el.pageDate.textContent = 'Updated ' + fmt(p.updated); updateMirror(); save(); }
+  function touched(p){ if (isCounsel(p) && !unlocked.has(p.sectionId)) return; p.updated = Date.now(); if (isCounsel(p)) queueEnc(p); el.pageDate.textContent = 'Updated ' + fmt(p.updated); updateMirror(); save(); }
   el.pageTitle.addEventListener('input', () => { const p = cur(); p.title = el.pageTitle.value; touched(p); });
   el.pageTitle.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.body.focus(); } });
   el.body.addEventListener('input', () => afterEdit());
@@ -2063,6 +2354,7 @@ What I'll adjust:
 
   $('btnNew').addEventListener('click', () => openCover(() => {
     const c = cur(), sec = secById(c.sectionId);
+    if (sec.kind === 'counsel') { if (!unlocked.has(sec.id)) { toast('Unlock the Counseling section first.'); return; } openCounselChooser(sec.id); return; }
     if (sec.kind === 'intent') { openChooser(sec.id); return; }
     if (sec.kind === 'planner') {
       const today = isoDate(new Date()), ps = pagesIn(sec.id).filter(x => x.planner);
@@ -2115,6 +2407,7 @@ What I'll adjust:
   });
 
   $('btnDelete').addEventListener('click', () => {
+    if (isLockedPage(cur())) { toast('Unlock the Counseling section first.'); return; }
     const p = cur(), name = p.title || 'this page', inSec = pagesIn(p.sectionId);
     if (inSec.length === 1) {
       if (!p.title && !p.body && !p.pdf && !Ink.has(p.id)) { toast('Each section keeps at least one page.'); return; }
@@ -2259,7 +2552,7 @@ What I'll adjust:
     save(true); Ink.flush();
     let pdf = {};
     try { pdf = await PdfStore.exportAll(); } catch (e) { toast("Couldn't include PDFs in this backup."); }
-    const blob = new Blob([JSON.stringify(Object.assign({}, state, { ink:Ink.all(), pdf }))], {type:'application/json'});
+    const blob = new Blob([JSON.stringify(Object.assign({}, serial(), { ink:Ink.all(), pdf }))], {type:'application/json'});
     const a = document.createElement('a'), d = new Date();
     a.href = URL.createObjectURL(blob);
     a.download = `notebook-backup-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.json`;
@@ -2278,6 +2571,7 @@ What I'll adjust:
       if (!confirm(`Replace this notebook with the ${plural(s.sections.length, 'section')} and ${plural(s.pages.length, 'page')} in the backup?`)) return;
       s.currentId = ordered(s)[0].id;
       state = s; query = '';
+      unlocked.clear(); maskLocked();
       const ids = new Set(s.pages.map(x => x.id)), ink = {};
       Object.keys((raw && raw.ink) || {}).forEach(k => { if (ids.has(k) && Array.isArray(raw.ink[k])) ink[k] = raw.ink[k]; });
       Ink.replaceAll(ink); undo.clear();
@@ -2416,6 +2710,7 @@ What I'll adjust:
     requestAnimationFrame(restore);
     Ink.ready.then(() => requestAnimationFrame(restore));
   }
+  if (addedCounsel) setTimeout(() => toast('A Counseling section has been added. Set a passcode to start.'), 600);
   if (addedIntent) setTimeout(() => toast('A Manifestation section has been added.'), 900);
   if (addedPlanner) setTimeout(() => toast(addedPlanner === 'replaced' ? 'Your planner is now a Daily Planner.' : 'A Daily Planner section has been added.'), 1200);
   if (added369) setTimeout(() => toast('A 3-6-9 Journal section has been added.'), 3600);
